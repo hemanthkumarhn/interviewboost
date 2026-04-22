@@ -87,9 +87,8 @@ export default function ResumePage() {
   }, [appliedJobs]);
 
   async function extractPdfText(file: File) {
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const pdfjs = await import("pdfjs-dist/webpack.mjs");
     const arrayBuffer = await file.arrayBuffer();
-    pdfjs.GlobalWorkerOptions.workerSrc = "";
     const pdf = await pdfjs.getDocument({
       data: new Uint8Array(arrayBuffer)
     }).promise;
@@ -109,7 +108,7 @@ export default function ResumePage() {
   }
 
   async function extractDocxText(file: File) {
-    const mammoth = await import("mammoth/mammoth.browser");
+    const mammoth = await import("mammoth");
     const arrayBuffer = await file.arrayBuffer();
     const result = await mammoth.extractRawText({ arrayBuffer });
     return result.value;
@@ -196,9 +195,7 @@ export default function ResumePage() {
 
       setResult(data);
       setMessage(
-        mode === "refine"
-          ? "Resume refined into a cleaner final version."
-          : "Resume improved successfully."
+        mode === "refine" ?"Resume refined into a cleaner final version." :"Resume improved successfully."
       );
     } catch (error) {
       setMessage(
@@ -354,9 +351,7 @@ export default function ResumePage() {
     doc.save("interviewboost-improved-resume.pdf");
     setShowJobPrompt(true);
     setMessage(
-      plan === "free"
-        ? "PDF downloaded with InterviewBoost watermark."
-        : "PDF downloaded without watermark."
+      plan === "free" ?"PDF downloaded with InterviewBoost watermark." :"PDF downloaded without watermark."
     );
   }
 
@@ -414,9 +409,7 @@ export default function ResumePage() {
                     type="button"
                     onClick={() => setPlan("free")}
                     className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                      plan === "free"
-                        ? "bg-[var(--color-brand)] text-white"
-                        : "text-[var(--color-text-soft)]"
+                      plan === "free" ?"bg-[var(--color-brand)] text-white" :"text-[var(--color-text-soft)]"
                     }`}
                   >
                     Free
@@ -425,9 +418,7 @@ export default function ResumePage() {
                     type="button"
                     onClick={() => setPlan("pro")}
                     className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                      plan === "pro"
-                        ? "bg-[var(--color-brand)] text-white"
-                        : "text-[var(--color-text-soft)]"
+                      plan === "pro" ?"bg-[var(--color-brand)] text-white" :"text-[var(--color-text-soft)]"
                     }`}
                   >
                     Pro
