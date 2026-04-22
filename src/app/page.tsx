@@ -1,147 +1,138 @@
+import Link from "next/link";
 import { Container } from "@/components/ui/container";
+import { LogoMark } from "@/components/ui/logo-mark";
 
 const problems = [
-  "Your resume sounds generic and does not reflect the exact job description.",
-  "Key ATS keywords are missing, so your profile gets filtered before a recruiter sees it.",
-  "Achievements are buried under vague bullet points instead of measurable impact.",
-  "The formatting looks cluttered on mobile and desktop, which reduces trust instantly."
+  "Your resume sounds generic, so recruiters cannot quickly connect you to the role.",
+  "Important ATS keywords are missing, which means your application gets filtered early.",
+  "Strong project work is buried under vague bullets instead of visible outcomes.",
+  "The final PDF looks plain or cluttered, which reduces trust before anyone reads deeply."
 ];
 
 const steps = [
   {
-    title: "Paste JD",
-    description: "Drop in the job description for the role you want to target."
+    title: "Upload or paste your resume",
+    description: "Bring an existing resume or start from raw text in a clean, guided flow."
   },
   {
-    title: "Improve",
-    description: "InterviewBoost rewrites your resume with sharper bullets, stronger keywords, and recruiter-friendly phrasing."
+    title: "Match it to a real job",
+    description: "Paste the job description and get safer, ATS-aware rewrites with clearer bullets."
   },
   {
-    title: "Download",
-    description: "Export a cleaner, tailored resume that is ready to send in minutes."
+    title: "Compare, score, and export",
+    description: "Review before/after changes, see the ATS score, then download the polished version."
   }
 ];
 
-const pricing = [
-  {
-    name: "Free",
-    price: "₹0",
-    description: "Perfect for trying the workflow before you commit.",
-    features: [
-      "1 resume optimization",
-      "Basic ATS keyword suggestions",
-      "Preview before download"
-    ],
-    cta: "Start Free",
-    featured: false
-  },
-  {
-    name: "Pro",
-    price: "₹299",
-    description: "For serious job seekers who want more shortlisted applications.",
-    features: [
-      "Unlimited resume improvements",
-      "Stronger job-specific bullet rewrites",
-      "Download polished final resume",
-      "Priority support"
-    ],
-    cta: "Get Pro",
-    featured: true
-  }
+const highlights = [
+  "Resume upload support",
+  "ATS score visibility",
+  "Before vs after bullet diffs",
+  "PDF export in minutes"
 ];
 
 export default function Home() {
   return (
     <main className="min-h-screen py-6 sm:py-8">
       <Container>
-        <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-black/20 backdrop-blur">
-          <section className="relative border-b border-white/10 px-6 pb-16 pt-6 sm:px-10 sm:pb-20 lg:px-14 lg:pt-8">
+        <div className="overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-soft)]">
+          <section className="border-b border-[var(--color-border)] px-6 py-6 sm:px-10 lg:px-14">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-300 text-lg font-bold text-stone-950">
-                  R
-                </div>
-                <div>
-                  <p className="text-lg font-semibold text-white">interviewboost</p>
-                  <p className="text-sm text-stone-400">Resume optimization for India</p>
-                </div>
+              <LogoMark />
+              <div className="hidden items-center gap-3 sm:flex">
+                <Link
+                  href="/resume"
+                  className="rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-soft)] transition hover:border-[var(--color-brand)] hover:text-[var(--color-brand)]"
+                >
+                  Open app
+                </Link>
+                <a
+                  href="#how-it-works"
+                  className="rounded-full bg-[var(--color-brand)] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--color-brand-strong)]"
+                >
+                  See how it works
+                </a>
               </div>
-              <a
-                href="#pricing"
-                className="hidden rounded-full border border-white/10 px-5 py-2 text-sm font-medium text-stone-200 transition hover:border-amber-300/40 hover:text-white sm:inline-flex"
-              >
-                See pricing
-              </a>
             </div>
 
-            <div className="mt-14 grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="mt-16 grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
               <div>
-                <span className="inline-flex rounded-full border border-amber-300/20 bg-amber-300/10 px-4 py-2 text-sm font-medium text-amber-200">
-                  Tailor every application in under 2 minutes
+                <span className="inline-flex rounded-full border border-[var(--color-accent)]/20 bg-[var(--color-accent-soft)] px-4 py-2 text-sm font-medium text-[var(--color-brand)]">
+                  Built for Indian job seekers
                 </span>
-                <h1 className="mt-6 max-w-4xl text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl lg:text-7xl">
+                <h1 className="mt-6 max-w-4xl text-4xl font-semibold tracking-[-0.04em] text-[var(--color-text)] sm:text-5xl lg:text-7xl">
                   Get your resume shortlisted in India in 2 minutes
                 </h1>
-                <p className="mt-6 max-w-2xl text-base leading-8 text-stone-300 sm:text-lg">
-                  Stop sending the same resume everywhere. Match the job description,
-                  surface the right keywords, and turn weak bullet points into strong
-                  proof of impact before you apply.
+                <p className="mt-6 max-w-2xl text-base leading-8 text-[var(--color-text-soft)] sm:text-lg">
+                  InterviewBoost helps you tailor your resume to a real job description,
+                  improve weak bullets without inventing experience, and export a cleaner
+                  version that is easier for recruiters and ATS systems to understand.
                 </p>
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                  <a
-                    href="#pricing"
-                    className="inline-flex items-center justify-center rounded-full bg-amber-300 px-6 py-3 text-base font-semibold text-stone-950 transition hover:bg-amber-200"
+                  <Link
+                    href="/resume"
+                    className="inline-flex items-center justify-center rounded-full bg-[var(--color-brand)] px-6 py-3 text-base font-semibold text-white transition hover:bg-[var(--color-brand-strong)]"
                   >
-                    Optimize My Resume
-                  </a>
+                    Improve my resume
+                  </Link>
                   <a
-                    href="#before-after"
-                    className="inline-flex items-center justify-center rounded-full border border-white/10 px-6 py-3 text-base font-medium text-stone-100 transition hover:border-white/30 hover:bg-white/5"
+                    href="#proof"
+                    className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] px-6 py-3 text-base font-medium text-[var(--color-brand)] transition hover:border-[var(--color-brand)] hover:bg-[var(--color-surface-soft)]"
                   >
-                    See Before vs After
+                    View before vs after
                   </a>
                 </div>
-                <div className="mt-8 flex flex-wrap gap-3 text-sm text-stone-400">
-                  <span className="rounded-full border border-white/10 px-4 py-2">ATS-friendly edits</span>
-                  <span className="rounded-full border border-white/10 px-4 py-2">Built for Indian job seekers</span>
-                  <span className="rounded-full border border-white/10 px-4 py-2">Instant export</span>
+                <div className="mt-8 flex flex-wrap gap-3 text-sm text-[var(--color-text-soft)]">
+                  {highlights.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full border border-[var(--color-border)] bg-white px-4 py-2"
+                    >
+                      {item}
+                    </span>
+                  ))}
                 </div>
               </div>
 
-              <div className="rounded-[1.75rem] border border-white/10 bg-stone-900/80 p-5 shadow-xl shadow-black/30">
-                <div className="rounded-[1.5rem] border border-white/10 bg-gradient-to-b from-stone-800 to-stone-900 p-5">
-                  <div className="flex items-center justify-between text-sm text-stone-400">
-                    <span>Resume match preview</span>
-                    <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-emerald-300">
-                      +41% stronger
+              <div className="rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface-soft)] p-5">
+                <div className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                  <div className="flex items-center justify-between text-sm text-[var(--color-text-soft)]">
+                    <span>Match preview</span>
+                    <span className="rounded-full bg-[var(--color-accent-soft)] px-3 py-1 font-semibold text-[var(--color-accent)]">
+                      ATS +41
                     </span>
                   </div>
                   <div className="mt-6 space-y-4">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <p className="text-xs uppercase tracking-[0.24em] text-stone-500">Before</p>
-                      <p className="mt-2 text-sm leading-7 text-stone-300">
-                        Worked on sales reporting and helped the team with client tasks.
+                    <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-text-soft)]">
+                        Before
+                      </p>
+                      <p className="mt-3 text-sm leading-7 text-[var(--color-text-soft)]">
+                        Worked on multiple mobile apps and collaborated with the team to
+                        handle project requirements.
                       </p>
                     </div>
-                    <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4">
-                      <p className="text-xs uppercase tracking-[0.24em] text-amber-200">After</p>
-                      <p className="mt-2 text-sm leading-7 text-white">
-                        Built weekly sales dashboards and streamlined client reporting,
-                        helping account managers respond faster and improve decision-making.
+                    <div className="rounded-2xl border border-[var(--color-accent)]/20 bg-[var(--color-accent-soft)] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-accent)]">
+                        After
+                      </p>
+                      <p className="mt-3 text-sm leading-7 text-[var(--color-text)]">
+                        Built and delivered multiple iOS applications while partnering with
+                        cross-functional teams to shape requirements and improve release quality.
                       </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <p className="text-2xl font-semibold text-white">2 min</p>
-                        <p className="mt-1 text-sm text-stone-400">Average turnaround</p>
+                      <div className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
+                        <p className="text-2xl font-semibold text-[var(--color-brand)]">2 min</p>
+                        <p className="mt-1 text-sm text-[var(--color-text-soft)]">Average turnaround</p>
                       </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <p className="text-2xl font-semibold text-white">ATS</p>
-                        <p className="mt-1 text-sm text-stone-400">Keyword optimization</p>
+                      <div className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
+                        <p className="text-2xl font-semibold text-[var(--color-brand)]">ATS</p>
+                        <p className="mt-1 text-sm text-[var(--color-text-soft)]">Score visibility</p>
                       </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <p className="text-2xl font-semibold text-white">PDF</p>
-                        <p className="mt-1 text-sm text-stone-400">Download ready</p>
+                      <div className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
+                        <p className="text-2xl font-semibold text-[var(--color-brand)]">PDF</p>
+                        <p className="mt-1 text-sm text-[var(--color-text-soft)]">Export ready</p>
                       </div>
                     </div>
                   </div>
@@ -151,28 +142,28 @@ export default function Home() {
           </section>
 
           <section className="px-6 py-16 sm:px-10 lg:px-14">
-            <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="grid gap-12 lg:grid-cols-[0.95fr_1.05fr]">
               <div>
-                <p className="text-sm font-medium uppercase tracking-[0.24em] text-amber-200">
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-accent)]">
                   Problem
                 </p>
-                <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
-                  Good candidates often get ignored for fixable resume reasons
+                <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-[var(--color-text)] sm:text-4xl">
+                  Most good candidates are not rejected because of skill, but because of positioning
                 </h2>
-                <p className="mt-4 max-w-xl text-base leading-8 text-stone-300">
-                  Recruiters move quickly. If your resume looks broad, weak, or
-                  mismatched to the role, you lose attention before the interview stage.
+                <p className="mt-4 max-w-xl text-base leading-8 text-[var(--color-text-soft)]">
+                  Recruiters move fast. If your resume is vague, under-optimized, or visually weak,
+                  you lose momentum before the first interview round even starts.
                 </p>
               </div>
               <div className="grid gap-4">
                 {problems.map((problem) => (
                   <div
                     key={problem}
-                    className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5 text-stone-200"
+                    className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5"
                   >
                     <div className="flex gap-4">
-                      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-amber-300" />
-                      <p className="text-base leading-7 text-stone-300">{problem}</p>
+                      <span className="mt-1.5 h-2.5 w-2.5 rounded-full bg-[var(--color-accent)]" />
+                      <p className="text-base leading-7 text-[var(--color-text-soft)]">{problem}</p>
                     </div>
                   </div>
                 ))}
@@ -180,161 +171,91 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="border-y border-white/10 bg-black/10 px-6 py-16 sm:px-10 lg:px-14">
-            <div className="mx-auto max-w-5xl text-center">
-              <p className="text-sm font-medium uppercase tracking-[0.24em] text-amber-200">
-                Solution
+          <section
+            id="how-it-works"
+            className="border-y border-[var(--color-border)] bg-[var(--color-surface-soft)] px-6 py-16 sm:px-10 lg:px-14"
+          >
+            <div className="mx-auto max-w-4xl text-center">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-accent)]">
+                How it works
               </p>
-              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
-                A simple 3-step flow that gets you application-ready fast
+              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-[var(--color-text)] sm:text-4xl">
+                A cleaner, faster path from raw resume to tailored application
               </h2>
             </div>
             <div className="mt-12 grid gap-5 lg:grid-cols-3">
               {steps.map((step, index) => (
                 <div
                   key={step.title}
-                  className="rounded-[1.75rem] border border-white/10 bg-stone-900/60 p-6"
+                  className="rounded-[1.75rem] border border-[var(--color-border)] bg-white p-6"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-300 text-lg font-bold text-stone-950">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-brand)] text-lg font-bold text-white">
                     {index + 1}
                   </div>
-                  <h3 className="mt-6 text-2xl font-semibold text-white">{step.title}</h3>
-                  <p className="mt-3 text-base leading-8 text-stone-300">{step.description}</p>
+                  <h3 className="mt-6 text-2xl font-semibold text-[var(--color-text)]">
+                    {step.title}
+                  </h3>
+                  <p className="mt-3 text-base leading-8 text-[var(--color-text-soft)]">
+                    {step.description}
+                  </p>
                 </div>
               ))}
             </div>
           </section>
 
-          <section
-            id="before-after"
-            className="px-6 py-16 sm:px-10 lg:px-14"
-          >
-            <div className="flex max-w-3xl flex-col gap-4">
-              <p className="text-sm font-medium uppercase tracking-[0.24em] text-amber-200">
-                Before vs After
+          <section id="proof" className="px-6 py-16 sm:px-10 lg:px-14">
+            <div className="mx-auto max-w-3xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--color-accent)]">
+                Before vs after
               </p>
-              <h2 className="text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
-                Small wording changes can make your resume feel ten times sharper
+              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-[var(--color-text)] sm:text-4xl">
+                Show users exactly what changed, not just a final block of text
               </h2>
             </div>
             <div className="mt-10 grid gap-6 lg:grid-cols-2">
-              <div className="rounded-[1.75rem] border border-rose-400/15 bg-rose-300/5 p-6">
-                <p className="text-sm font-medium uppercase tracking-[0.22em] text-rose-200">
+              <div className="rounded-[1.75rem] border border-[var(--color-border)] bg-white p-6">
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-text-soft)]">
                   Before
                 </p>
-                <h3 className="mt-4 text-2xl font-semibold text-white">Too vague</h3>
-                <ul className="mt-6 space-y-4 text-base leading-8 text-stone-300">
-                  <li>Responsible for handling marketing activities.</li>
-                  <li>Worked with different teams on campaigns.</li>
-                  <li>Helped improve social media engagement.</li>
+                <ul className="mt-6 space-y-4 text-base leading-8 text-[var(--color-text-soft)]">
+                  <li>Worked on multiple mobile applications from scratch.</li>
+                  <li>Collaborated with different teams to solve project requirements.</li>
+                  <li>Documented technical details for future reference.</li>
                 </ul>
               </div>
-              <div className="rounded-[1.75rem] border border-emerald-400/20 bg-emerald-300/5 p-6">
-                <p className="text-sm font-medium uppercase tracking-[0.22em] text-emerald-200">
+              <div className="rounded-[1.75rem] border border-[var(--color-accent)]/20 bg-[var(--color-accent-soft)] p-6">
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-accent)]">
                   After
                 </p>
-                <h3 className="mt-4 text-2xl font-semibold text-white">Clear and relevant</h3>
-                <ul className="mt-6 space-y-4 text-base leading-8 text-stone-200">
-                  <li>Executed multi-channel marketing campaigns aligned to quarterly growth goals.</li>
-                  <li>Partnered with sales and design teams to launch faster, better-targeted campaigns.</li>
-                  <li>Improved social engagement with stronger content planning and performance-led iterations.</li>
+                <ul className="mt-6 space-y-4 text-base leading-8 text-[var(--color-text)]">
+                  <li>Built multiple mobile applications from scratch across production teams and client workflows.</li>
+                  <li>Partnered with cross-functional stakeholders to refine requirements and improve delivery quality.</li>
+                  <li>Documented technical design decisions and development practices for future reuse.</li>
                 </ul>
               </div>
             </div>
           </section>
 
-          <section
-            id="pricing"
-            className="border-y border-white/10 bg-white/5 px-6 py-16 sm:px-10 lg:px-14"
-          >
-            <div className="mx-auto max-w-3xl text-center">
-              <p className="text-sm font-medium uppercase tracking-[0.24em] text-amber-200">
-                Pricing
-              </p>
-              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
-                Start free, then upgrade when you are ready to apply at scale
-              </h2>
-            </div>
-            <div className="mt-12 grid gap-6 lg:grid-cols-2">
-              {pricing.map((plan) => (
-                <div
-                  key={plan.name}
-                  className={`rounded-[1.75rem] border p-7 ${
-                    plan.featured
-                      ? "border-amber-300/30 bg-amber-300/10 shadow-xl shadow-amber-950/10"
-                      : "border-white/10 bg-stone-900/50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-lg font-semibold text-white">{plan.name}</p>
-                      <p className="mt-2 text-sm leading-7 text-stone-300">{plan.description}</p>
-                    </div>
-                    {plan.featured ? (
-                      <span className="rounded-full bg-amber-300 px-3 py-1 text-sm font-semibold text-stone-950">
-                        Most Popular
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-8 text-5xl font-semibold tracking-[-0.05em] text-white">
-                    {plan.price}
-                  </p>
-                  <ul className="mt-8 space-y-3 text-base text-stone-200">
-                    {plan.features.map((feature) => (
-                      <li
-                        key={feature}
-                        className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
-                      >
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <a
-                    href="#final-cta"
-                    className={`mt-8 inline-flex w-full items-center justify-center rounded-full px-6 py-3 text-base font-semibold transition ${
-                      plan.featured
-                        ? "bg-amber-300 text-stone-950 hover:bg-amber-200"
-                        : "border border-white/10 text-white hover:bg-white/5"
-                    }`}
-                  >
-                    {plan.cta}
-                  </a>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section
-            id="final-cta"
-            className="px-6 py-16 sm:px-10 lg:px-14"
-          >
-            <div className="rounded-[2rem] border border-white/10 bg-gradient-to-r from-amber-300 to-yellow-200 p-8 text-stone-950 sm:p-10 lg:p-12">
-              <div className="max-w-3xl">
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-stone-700">
+          <section className="border-t border-[var(--color-border)] bg-white px-6 py-16 sm:px-10 lg:px-14">
+            <div className="flex flex-col gap-6 rounded-[2rem] bg-[var(--color-brand)] px-8 py-10 text-white lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
                   Final CTA
                 </p>
-                <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] sm:text-4xl lg:text-5xl">
-                  Your next interview might depend on a better resume, not better luck
+                <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">
+                  Give recruiters a sharper, safer version of your resume
                 </h2>
-                <p className="mt-5 max-w-2xl text-base leading-8 text-stone-700 sm:text-lg">
-                  Make your experience easier to understand, easier to trust, and easier to shortlist.
-                  Start with the free version and upgrade to Pro for just ₹299 when you need more.
+                <p className="mt-4 text-base leading-8 text-white/80">
+                  Upload, compare, score, and export in one place. Start with your next job
+                  description now.
                 </p>
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                  <a
-                    href="#pricing"
-                    className="inline-flex items-center justify-center rounded-full bg-stone-950 px-6 py-3 text-base font-semibold text-white transition hover:bg-stone-800"
-                  >
-                    Start Free Now
-                  </a>
-                  <a
-                    href="#"
-                    className="inline-flex items-center justify-center rounded-full border border-stone-900/10 px-6 py-3 text-base font-semibold text-stone-900 transition hover:bg-white/30"
-                  >
-                    Upgrade to Pro
-                  </a>
-                </div>
               </div>
+              <Link
+                href="/resume"
+                className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-base font-semibold text-[var(--color-brand)] transition hover:bg-slate-100"
+              >
+                Open InterviewBoost
+              </Link>
             </div>
           </section>
         </div>

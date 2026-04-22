@@ -1,12 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { jsPDF } from "jspdf";
 import { Container } from "@/components/ui/container";
+import { LogoMark } from "@/components/ui/logo-mark";
+
+type BulletDiff = {
+  before: string;
+  after: string;
+};
 
 type MatchResponse = {
   improvedText: string;
+  beforeAfterBullets: BulletDiff[];
   addedKeywords: string[];
+  missingKeywords: string[];
+  atsMatchScore: number;
   improvementSummary: string[];
 };
 
@@ -19,16 +29,42 @@ type JobEntry = {
 
 const JOBS_STORAGE_KEY = "interviewboost-applied-jobs";
 
+function scoreLabel(score: number) {
+  if (score >= 80) {
+    return "Strong match";
+  }
+
+  if (score >= 60) {
+    return "Decent match";
+  }
+
+  return "Needs work";
+}
+
+function scoreTone(score: number) {
+  if (score >= 80) {
+    return "text-emerald-700 bg-emerald-100";
+  }
+
+  if (score >= 60) {
+    return "text-amber-700 bg-amber-100";
+  }
+
+  return "text-rose-700 bg-rose-100";
+}
+
 export default function ResumePage() {
   const [resume, setResume] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isParsingResume, setIsParsingResume] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [result, setResult] = useState<MatchResponse | null>(null);
   const [plan, setPlan] = useState<"free" | "pro">("free");
   const [showJobPrompt, setShowJobPrompt] = useState(false);
   const [jobRole, setJobRole] = useState("");
   const [company, setCompany] = useState("");
+  const [resumeFileName, setResumeFileName] = useState<string | null>(null);
   const [appliedJobs, setAppliedJobs] = useState<JobEntry[]>([]);
 
   useEffect(() => {
@@ -49,6 +85,85 @@ export default function ResumePage() {
   useEffect(() => {
     window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(appliedJobs));
   }, [appliedJobs]);
+
+  async function extractPdfText(file: File) {
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const arrayBuffer = await file.arrayBuffer();
+    pdfjs.GlobalWorkerOptions.workerSrc = "";
+    const pdf = await pdfjs.getDocument({
+      data: new Uint8Array(arrayBuffer)
+    }).promise;
+
+    const pages: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item) => ("str" in item ? item.str : ""))
+        .join(" ");
+      pages.push(pageText);
+    }
+
+    return pages.join("\n");
+  }
+
+  async function extractDocxText(file: File) {
+    const mammoth = await import("mammoth/mammoth.browser");
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+  }
+
+  async function extractResumeText(file: File) {
+    const fileName = file.name.toLowerCase();
+
+    if (fileName.endsWith(".txt")) {
+      return file.text();
+    }
+
+    if (fileName.endsWith(".pdf")) {
+      return extractPdfText(file);
+    }
+
+    if (fileName.endsWith(".docx")) {
+      return extractDocxText(file);
+    }
+
+    throw new Error("Please upload a PDF, DOCX, or TXT resume.");
+  }
+
+  async function handleResumeUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setIsParsingResume(true);
+    setMessage(null);
+
+    try {
+      const text = await extractResumeText(file);
+
+      if (!text.trim()) {
+        throw new Error(
+          "We could not extract readable text from this file. Try a text-based PDF, DOCX, or TXT resume."
+        );
+      }
+
+      setResume(text.trim());
+      setResumeFileName(file.name);
+      setMessage(`Uploaded ${file.name} successfully.`);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Unable to read that resume file."
+      );
+    } finally {
+      setIsParsingResume(false);
+      event.target.value = "";
+    }
+  }
 
   async function runImprovement(mode: "initial" | "refine") {
     setIsLoading(true);
@@ -79,14 +194,10 @@ export default function ResumePage() {
         throw new Error(data.error ?? "Something went wrong. Please try again.");
       }
 
-      setResult({
-        improvedText: data.improvedText,
-        addedKeywords: data.addedKeywords,
-        improvementSummary: data.improvementSummary
-      });
+      setResult(data);
       setMessage(
         mode === "refine"
-          ? "Resume refined into a more polished version."
+          ? "Resume refined into a cleaner final version."
           : "Resume improved successfully."
       );
     } catch (error) {
@@ -166,12 +277,7 @@ export default function ResumePage() {
       const gapAfter = options.gapAfter ?? 16;
 
       doc.setFontSize(fontSize);
-
-      if (options.color) {
-        doc.setTextColor(...options.color);
-      } else {
-        doc.setTextColor(30, 30, 30);
-      }
+      doc.setTextColor(...(options.color ?? [30, 30, 30]));
 
       const lines = doc.splitTextToSize(text, maxWidth) as string[];
 
@@ -196,21 +302,21 @@ export default function ResumePage() {
     }
 
     doc.setFont("helvetica", "bold");
-    addWrappedBlock("Improved Resume", {
+    addWrappedBlock("InterviewBoost Resume Export", {
       fontSize: 20,
       color: [15, 23, 42],
       gapAfter: 10
     });
 
     doc.setFont("helvetica", "normal");
-    addWrappedBlock("ATS-friendly export generated by InterviewBoost.", {
-      fontSize: 10,
-      color: [90, 90, 90],
+    addWrappedBlock(`ATS Match Score: ${result.atsMatchScore}/100`, {
+      fontSize: 11,
+      color: [71, 85, 105],
       gapAfter: 20
     });
 
     doc.setFont("helvetica", "bold");
-    addWrappedBlock("Resume Content", {
+    addWrappedBlock("Improved Resume", {
       fontSize: 13,
       color: [15, 23, 42],
       gapAfter: 10
@@ -231,7 +337,7 @@ export default function ResumePage() {
 
     if (result.addedKeywords.length > 0) {
       doc.setFont("helvetica", "bold");
-      addWrappedBlock("Keywords Added", {
+      addWrappedBlock("Keywords Used Safely", {
         fontSize: 13,
         color: [15, 23, 42],
         gapAfter: 10
@@ -242,24 +348,6 @@ export default function ResumePage() {
         fontSize: 11,
         color: [30, 30, 30],
         gapAfter: 18
-      });
-    }
-
-    if (result.improvementSummary.length > 0) {
-      doc.setFont("helvetica", "bold");
-      addWrappedBlock("Improvement Summary", {
-        fontSize: 13,
-        color: [15, 23, 42],
-        gapAfter: 10
-      });
-
-      doc.setFont("helvetica", "normal");
-      result.improvementSummary.forEach((item) => {
-        addWrappedBlock(`- ${item}`, {
-          fontSize: 11,
-          color: [30, 30, 30],
-          gapAfter: 8
-        });
       });
     }
 
@@ -293,287 +381,427 @@ export default function ResumePage() {
   }
 
   return (
-    <main className="min-h-screen py-10 sm:py-16">
+    <main className="min-h-screen py-6 sm:py-8">
       <Container>
-        <div className="mx-auto max-w-5xl rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8 lg:p-10">
-          <div className="mx-auto max-w-2xl text-center">
-            <span className="inline-flex rounded-full border border-amber-300/20 bg-amber-300/10 px-4 py-2 text-sm font-medium text-amber-200">
-              Resume Optimizer
-            </span>
-            <h1 className="mt-5 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-5xl">
-              Improve your resume for a specific job
-            </h1>
-            <p className="mt-4 text-base leading-8 text-stone-300 sm:text-lg">
-              Paste your current resume and the job description below, then let
-              InterviewBoost prepare them for a stronger match.
-            </p>
-            <div className="mt-6 inline-flex rounded-full border border-white/10 bg-black/10 p-1">
-              <button
-                type="button"
-                onClick={() => setPlan("free")}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                  plan === "free"
-                    ? "bg-amber-300 text-stone-950"
-                    : "text-stone-300 hover:text-white"
-                }`}
-              >
-                Free
-              </button>
-              <button
-                type="button"
-                onClick={() => setPlan("pro")}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                  plan === "pro"
-                    ? "bg-amber-300 text-stone-950"
-                    : "text-stone-300 hover:text-white"
-                }`}
-              >
-                Pro
-              </button>
+        <div className="overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-soft)]">
+          <section className="border-b border-[var(--color-border)] px-6 py-6 sm:px-10 lg:px-14">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <LogoMark />
+                <div className="mt-5 max-w-2xl">
+                  <span className="inline-flex rounded-full border border-[var(--color-accent)]/20 bg-[var(--color-accent-soft)] px-4 py-2 text-sm font-medium text-[var(--color-brand)]">
+                    Upload, compare, score, and export
+                  </span>
+                  <h1 className="mt-5 text-3xl font-semibold tracking-[-0.03em] text-[var(--color-text)] sm:text-5xl">
+                    Improve your resume for a specific job
+                  </h1>
+                  <p className="mt-4 text-base leading-8 text-[var(--color-text-soft)] sm:text-lg">
+                    Upload an existing resume or paste the text manually, match it to
+                    a real job description, and review safer before/after changes before
+                    you export.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Link
+                  href="/"
+                  className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] px-5 py-3 text-sm font-medium text-[var(--color-brand)] transition hover:bg-[var(--color-surface-soft)]"
+                >
+                  Back to home
+                </Link>
+                <div className="inline-flex rounded-full border border-[var(--color-border)] bg-[var(--color-surface-soft)] p-1">
+                  <button
+                    type="button"
+                    onClick={() => setPlan("free")}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                      plan === "free"
+                        ? "bg-[var(--color-brand)] text-white"
+                        : "text-[var(--color-text-soft)]"
+                    }`}
+                  >
+                    Free
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlan("pro")}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                      plan === "pro"
+                        ? "bg-[var(--color-brand)] text-white"
+                        : "text-[var(--color-text-soft)]"
+                    }`}
+                  >
+                    Pro
+                  </button>
+                </div>
+              </div>
             </div>
-            <p className="mt-3 text-sm text-stone-400">
-              Mock plan switch for PDF export. Free includes a watermark. Pro removes it.
-            </p>
-          </div>
+          </section>
 
-          <div className="mt-10 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="grid gap-6">
-              <label className="block">
-                <span className="mb-3 block text-sm font-medium text-stone-200">
-                  Your resume
-                </span>
-                <textarea
-                  value={resume}
-                  onChange={(event) => setResume(event.target.value)}
-                  placeholder="Paste your resume here..."
-                  className="min-h-[220px] w-full rounded-[1.5rem] border border-white/10 bg-stone-950/70 px-5 py-4 text-base text-white outline-none transition placeholder:text-stone-500 focus:border-amber-300/40 focus:ring-2 focus:ring-amber-300/20"
-                />
-              </label>
+          <section className="px-6 py-8 sm:px-10 lg:px-14">
+            <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
+              <div className="grid gap-6">
+                <section className="rounded-[1.75rem] border border-[var(--color-border)] bg-white p-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-xl font-semibold text-[var(--color-text)]">Resume Input</h2>
+                      <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
+                        Paste text directly or upload a PDF, DOCX, or TXT resume.
+                      </p>
+                    </div>
+                    <label className="inline-flex cursor-pointer items-center justify-center rounded-full bg-[var(--color-brand)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-brand-strong)]">
+                      {isParsingResume ? "Reading resume..." : "Upload resume"}
+                      <input
+                        type="file"
+                        accept=".pdf,.docx,.txt"
+                        className="hidden"
+                        onChange={handleResumeUpload}
+                        disabled={isParsingResume}
+                      />
+                    </label>
+                  </div>
 
-              <label className="block">
-                <span className="mb-3 block text-sm font-medium text-stone-200">
-                  Job description
-                </span>
-                <textarea
-                  value={jobDescription}
-                  onChange={(event) => setJobDescription(event.target.value)}
-                  placeholder="Paste the job description here..."
-                  className="min-h-[220px] w-full rounded-[1.5rem] border border-white/10 bg-stone-950/70 px-5 py-4 text-base text-white outline-none transition placeholder:text-stone-500 focus:border-amber-300/40 focus:ring-2 focus:ring-amber-300/20"
-                />
-              </label>
+                  <div className="mt-5 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-4 text-sm text-[var(--color-text-soft)]">
+                    {resumeFileName ? `Loaded file: ${resumeFileName}` : "No file uploaded yet."}
+                  </div>
 
-              <section className="rounded-[1.5rem] border border-white/10 bg-stone-950/50 p-5 sm:p-6">
+                  <label className="mt-5 block">
+                    <span className="mb-3 block text-sm font-medium text-[var(--color-text)]">
+                      Resume text
+                    </span>
+                    <textarea
+                      value={resume}
+                      onChange={(event) => setResume(event.target.value)}
+                      placeholder="Paste your resume here if you do not want to upload a file..."
+                      className="min-h-[260px] w-full rounded-[1.5rem] border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4 text-base text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                    />
+                  </label>
+                </section>
+
+                <section className="rounded-[1.75rem] border border-[var(--color-border)] bg-white p-6">
+                  <h2 className="text-xl font-semibold text-[var(--color-text)]">Job Description</h2>
+                  <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
+                    Paste the role description so InterviewBoost can tailor your resume to it.
+                  </p>
+                  <label className="mt-5 block">
+                    <textarea
+                      value={jobDescription}
+                      onChange={(event) => setJobDescription(event.target.value)}
+                      placeholder="Paste the job description here..."
+                      className="min-h-[240px] w-full rounded-[1.5rem] border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4 text-base text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                    />
+                  </label>
+                </section>
+
+                <section className="rounded-[1.75rem] border border-[var(--color-border)] bg-white p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-[var(--color-text)]">Applied Jobs</h2>
+                      <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
+                        Minimal Phase 0 tracker for jobs you already applied to.
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-text-soft)]">
+                      Phase 0
+                    </span>
+                  </div>
+
+                  {appliedJobs.length > 0 ? (
+                    <div className="mt-5 grid gap-3">
+                      {appliedJobs.map((job) => (
+                        <div
+                          key={job.id}
+                          className="flex flex-col gap-3 rounded-[1.25rem] border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div>
+                            <p className="text-base font-semibold text-[var(--color-text)]">{job.role}</p>
+                            <p className="mt-1 text-sm text-[var(--color-text-soft)]">{job.company}</p>
+                          </div>
+                          <span className="inline-flex w-fit rounded-full bg-[var(--color-accent-soft)] px-3 py-1 text-sm font-medium text-[var(--color-accent)]">
+                            {job.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-5 rounded-[1.25rem] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-soft)] p-4 text-sm leading-7 text-[var(--color-text-soft)]">
+                      No jobs tracked yet. After PDF download, you can save the role and company here.
+                    </div>
+                  )}
+                </section>
+              </div>
+
+              <div className="rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface-soft)] p-5 sm:p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-white">Applied Jobs</h2>
-                    <p className="mt-2 text-sm leading-7 text-stone-400">
-                      Minimal tracker for jobs you already applied to.
+                    <h2 className="text-xl font-semibold text-[var(--color-text)]">Result Preview</h2>
+                    <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
+                      Review ATS score, bullet-level changes, and safer keywords before exporting.
                     </p>
                   </div>
-                  <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-stone-400">
-                    Phase 0
+                  <span className="rounded-full border border-[var(--color-border)] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-text-soft)]">
+                    AI Output
                   </span>
                 </div>
 
-                {appliedJobs.length > 0 ? (
-                  <div className="mt-5 grid gap-3">
-                    {appliedJobs.map((job) => (
-                      <div
-                        key={job.id}
-                        className="flex flex-col gap-3 rounded-[1.25rem] border border-white/10 bg-black/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div>
-                          <p className="text-base font-semibold text-white">{job.role}</p>
-                          <p className="mt-1 text-sm text-stone-400">{job.company}</p>
-                        </div>
-                        <span className="inline-flex w-fit rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-sm font-medium text-emerald-200">
-                          {job.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-5 rounded-[1.25rem] border border-dashed border-white/10 bg-black/10 p-4 text-sm leading-7 text-stone-400">
-                    No jobs tracked yet. After you download the PDF, you can quickly save the role and company here.
-                  </div>
-                )}
-              </section>
-            </div>
-
-            <div className="rounded-[1.5rem] border border-white/10 bg-stone-950/50 p-5 sm:p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-semibold text-white">Result Preview</h2>
-                  <p className="mt-2 text-sm leading-7 text-stone-400">
-                    Review the improved version, keywords, and summary before applying changes.
-                  </p>
-                </div>
-                <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-stone-400">
-                  AI Output
-                </span>
-              </div>
-
-              <div className="mt-6 flex flex-col gap-4">
-                <div className="flex flex-col items-stretch gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={handleImproveResume}
-                    disabled={isLoading || !resume.trim() || !jobDescription.trim()}
-                    className="inline-flex min-w-[220px] items-center justify-center gap-3 rounded-full bg-amber-300 px-6 py-3 text-base font-semibold text-stone-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {isLoading ? (
-                      <>
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-stone-950/30 border-t-stone-950" />
-                        Improving Resume...
-                      </>
-                    ) : (
-                      "Improve Resume"
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleApplyChanges}
-                    disabled={!result || isLoading}
-                    className="inline-flex min-w-[180px] items-center justify-center rounded-full border border-white/10 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Apply changes
-                  </button>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={handleImproveAgain}
-                    disabled={isLoading || !resume.trim() || !jobDescription.trim()}
-                    className="inline-flex w-full items-center justify-center rounded-full border border-amber-300/20 bg-amber-300/10 px-6 py-3 text-sm font-semibold text-amber-100 transition hover:bg-amber-300/15 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Improve again
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleDownloadPdf}
-                    disabled={!result || isLoading}
-                    className="inline-flex w-full items-center justify-center rounded-full border border-white/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Download PDF
-                  </button>
-                </div>
-
-                {message ? <p className="text-sm text-stone-300">{message}</p> : null}
-
-                {isLoading ? (
-                  <div className="rounded-2xl border border-amber-300/10 bg-amber-300/5 px-4 py-4 text-sm text-amber-100">
-                    Analyzing your resume, matching keywords, and rewriting bullets...
-                  </div>
-                ) : null}
-
-                {result ? (
-                  <div className="rounded-2xl border border-sky-300/10 bg-sky-300/5 px-4 py-4">
-                    <p className="text-sm font-medium text-sky-100">
-                      Most users improve 2-3 times before getting results
-                    </p>
+                <div className="mt-6 flex flex-col gap-4">
+                  <div className="flex flex-col items-stretch gap-3 sm:flex-row">
                     <button
                       type="button"
-                      onClick={handleTryAnotherJobDescription}
-                      className="mt-3 inline-flex items-center justify-center rounded-full border border-sky-300/20 px-4 py-2 text-sm font-semibold text-sky-100 transition hover:bg-sky-300/10"
+                      onClick={handleImproveResume}
+                      disabled={isLoading || isParsingResume || !resume.trim() || !jobDescription.trim()}
+                      className="inline-flex min-w-[220px] items-center justify-center gap-3 rounded-full bg-[var(--color-brand)] px-6 py-3 text-base font-semibold text-white transition hover:bg-[var(--color-brand-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Try another job description
+                      {isLoading ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                          Improving Resume...
+                        </>
+                      ) : (
+                        "Improve Resume"
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleApplyChanges}
+                      disabled={!result || isLoading}
+                      className="inline-flex min-w-[180px] items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-6 py-3 text-base font-semibold text-[var(--color-brand)] transition hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Apply changes
                     </button>
                   </div>
-                ) : null}
 
-                {showJobPrompt ? (
-                  <section className="rounded-[1.25rem] border border-emerald-300/15 bg-emerald-300/5 p-4">
-                    <h3 className="text-base font-semibold text-white">
-                      Did you apply for this job?
-                    </h3>
-                    <p className="mt-2 text-sm leading-7 text-stone-300">
-                      If yes, save it to your tracker with the role and company.
-                    </p>
-                    <div className="mt-4 grid gap-3">
-                      <input
-                        value={jobRole}
-                        onChange={(event) => setJobRole(event.target.value)}
-                        placeholder="Role"
-                        className="w-full rounded-2xl border border-white/10 bg-stone-950/70 px-4 py-3 text-sm text-white outline-none transition placeholder:text-stone-500 focus:border-amber-300/40 focus:ring-2 focus:ring-amber-300/20"
-                      />
-                      <input
-                        value={company}
-                        onChange={(event) => setCompany(event.target.value)}
-                        placeholder="Company"
-                        className="w-full rounded-2xl border border-white/10 bg-stone-950/70 px-4 py-3 text-sm text-white outline-none transition placeholder:text-stone-500 focus:border-amber-300/40 focus:ring-2 focus:ring-amber-300/20"
-                      />
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <button
-                          type="button"
-                          onClick={handleSaveAppliedJob}
-                          className="inline-flex items-center justify-center rounded-full bg-amber-300 px-5 py-3 text-sm font-semibold text-stone-950 transition hover:bg-amber-200"
-                        >
-                          Yes, save job
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowJobPrompt(false)}
-                          className="inline-flex items-center justify-center rounded-full border border-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/5"
-                        >
-                          Not now
-                        </button>
-                      </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={handleImproveAgain}
+                      disabled={isLoading || !result}
+                      className="inline-flex w-full items-center justify-center rounded-full border border-[var(--color-brand)]/10 bg-white px-6 py-3 text-sm font-semibold text-[var(--color-brand)] transition hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Improve again
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadPdf}
+                      disabled={!result || isLoading}
+                      className="inline-flex w-full items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-6 py-3 text-sm font-semibold text-[var(--color-text)] transition hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Download PDF
+                    </button>
+                  </div>
+
+                  {message ? (
+                    <div className="rounded-2xl border border-[var(--color-border)] bg-white px-4 py-4 text-sm text-[var(--color-text-soft)]">
+                      {message}
                     </div>
-                  </section>
-                ) : null}
-              </div>
+                  ) : null}
 
-              {result ? (
-                <div className="mt-6 grid gap-5">
-                  <section className="rounded-[1.25rem] border border-white/10 bg-black/10 p-5">
-                    <h3 className="text-lg font-semibold text-white">Improved Resume Text</h3>
-                    <pre className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-300">
-                      {result.improvedText}
-                    </pre>
-                  </section>
+                  {isLoading ? (
+                    <div className="rounded-2xl border border-[var(--color-accent)]/10 bg-[var(--color-accent-soft)] px-4 py-4 text-sm text-[var(--color-brand)]">
+                      Analyzing your resume, checking keyword fit, rewriting bullets, and validating output...
+                    </div>
+                  ) : null}
 
-                  <section className="rounded-[1.25rem] border border-white/10 bg-black/10 p-5">
-                    <h3 className="text-lg font-semibold text-white">Keywords Added</h3>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      {result.addedKeywords.length > 0 ? (
-                        result.addedKeywords.map((keyword) => (
-                          <span
-                            key={keyword}
-                            className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-100"
+                  {result ? (
+                    <div className="rounded-2xl border border-[var(--color-brand)]/10 bg-white px-4 py-4">
+                      <p className="text-sm font-medium text-[var(--color-brand)]">
+                        Most users improve 2-3 times before getting results
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleTryAnotherJobDescription}
+                        className="mt-3 inline-flex items-center justify-center rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-brand)] transition hover:bg-[var(--color-surface)]"
+                      >
+                        Try another job description
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {showJobPrompt ? (
+                    <section className="rounded-[1.25rem] border border-[var(--color-accent)]/10 bg-white p-4">
+                      <h3 className="text-base font-semibold text-[var(--color-text)]">
+                        Did you apply for this job?
+                      </h3>
+                      <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
+                        If yes, save it to your tracker with the role and company.
+                      </p>
+                      <div className="mt-4 grid gap-3">
+                        <input
+                          value={jobRole}
+                          onChange={(event) => setJobRole(event.target.value)}
+                          placeholder="Role"
+                          className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                        />
+                        <input
+                          value={company}
+                          onChange={(event) => setCompany(event.target.value)}
+                          placeholder="Company"
+                          className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                        />
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <button
+                            type="button"
+                            onClick={handleSaveAppliedJob}
+                            className="inline-flex items-center justify-center rounded-full bg-[var(--color-brand)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-brand-strong)]"
                           >
-                            {keyword}
-                          </span>
-                        ))
-                      ) : (
-                        <p className="text-sm text-stone-400">No additional keywords were suggested.</p>
-                      )}
-                    </div>
-                  </section>
+                            Yes, save job
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowJobPrompt(false)}
+                            className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--color-text)] transition hover:bg-[var(--color-surface)]"
+                          >
+                            Not now
+                          </button>
+                        </div>
+                      </div>
+                    </section>
+                  ) : null}
+                </div>
 
-                  <section className="rounded-[1.25rem] border border-white/10 bg-black/10 p-5">
-                    <h3 className="text-lg font-semibold text-white">Summary</h3>
-                    <ul className="mt-4 space-y-3 text-sm leading-7 text-stone-300">
-                      {result.improvementSummary.map((item) => (
-                        <li
-                          key={item}
-                          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
-                        >
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                </div>
-              ) : (
-                <div className="mt-6 rounded-[1.25rem] border border-dashed border-white/10 bg-black/10 p-6 text-sm leading-7 text-stone-400">
-                  Your improved resume will appear here after you click <span className="text-stone-200">Improve Resume</span>.
-                </div>
-              )}
+                {result ? (
+                  <div className="mt-6 grid gap-5">
+                    <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-[var(--color-text)]">ATS Match Score</h3>
+                          <p className="mt-1 text-sm text-[var(--color-text-soft)]">
+                            A quick estimate of keyword fit, bullet quality, and job relevance.
+                          </p>
+                        </div>
+                        <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${scoreTone(result.atsMatchScore)}`}>
+                          {scoreLabel(result.atsMatchScore)}
+                        </span>
+                      </div>
+                      <div className="mt-5">
+                        <div className="flex items-end justify-between">
+                          <p className="text-4xl font-semibold tracking-[-0.04em] text-[var(--color-brand)]">
+                            {result.atsMatchScore}
+                          </p>
+                          <p className="text-sm text-[var(--color-text-soft)]">out of 100</p>
+                        </div>
+                        <div className="mt-4 h-3 overflow-hidden rounded-full bg-[var(--color-surface-soft)]">
+                          <div
+                            className="h-full rounded-full bg-[var(--color-accent)]"
+                            style={{ width: `${result.atsMatchScore}%` }}
+                          />
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                      <h3 className="text-lg font-semibold text-[var(--color-text)]">Before vs After</h3>
+                      <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
+                        This view shows exactly how each bullet changed.
+                      </p>
+                      <div className="mt-5 grid gap-4">
+                        {result.beforeAfterBullets.length > 0 ? (
+                          result.beforeAfterBullets.map((bullet, index) => (
+                            <div
+                              key={`${bullet.before}-${index}`}
+                              className="grid gap-3 rounded-[1.25rem] border border-[var(--color-border)] bg-[var(--color-surface-soft)] p-4 lg:grid-cols-2"
+                            >
+                              <div className="rounded-2xl bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-text-soft)]">
+                                  Before
+                                </p>
+                                <p className="mt-3 text-sm leading-7 text-[var(--color-text-soft)]">
+                                  {bullet.before}
+                                </p>
+                              </div>
+                              <div className="rounded-2xl bg-[var(--color-surface-accent)] p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+                                  After
+                                </p>
+                                <p className="mt-3 text-sm leading-7 text-[var(--color-text)]">
+                                  {bullet.after}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-soft)] p-4 text-sm leading-7 text-[var(--color-text-soft)]">
+                            No bullet-level diff was returned for this run.
+                          </div>
+                        )}
+                      </div>
+                    </section>
+
+                    <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                      <h3 className="text-lg font-semibold text-[var(--color-text)]">Improved Resume Text</h3>
+                      <pre className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--color-text-soft)]">
+                        {result.improvedText}
+                      </pre>
+                    </section>
+
+                    <div className="grid gap-5 lg:grid-cols-2">
+                      <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                        <h3 className="text-lg font-semibold text-[var(--color-text)]">Keywords Used Safely</h3>
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          {result.addedKeywords.length > 0 ? (
+                            result.addedKeywords.map((keyword) => (
+                              <span
+                                key={keyword}
+                                className="rounded-full bg-[var(--color-accent-soft)] px-3 py-2 text-sm text-[var(--color-accent)]"
+                              >
+                                {keyword}
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-sm text-[var(--color-text-soft)]">
+                              No supported keywords were added safely in this run.
+                            </p>
+                          )}
+                        </div>
+                      </section>
+
+                      <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                        <h3 className="text-lg font-semibold text-[var(--color-text)]">Missing Keywords</h3>
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          {result.missingKeywords.length > 0 ? (
+                            result.missingKeywords.map((keyword) => (
+                              <span
+                                key={keyword}
+                                className="rounded-full bg-rose-50 px-3 py-2 text-sm text-rose-700"
+                              >
+                                {keyword}
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-sm text-[var(--color-text-soft)]">
+                              No major unsupported keywords are missing from the current version.
+                            </p>
+                          )}
+                        </div>
+                      </section>
+                    </div>
+
+                    <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                      <h3 className="text-lg font-semibold text-[var(--color-text)]">Improvement Summary</h3>
+                      <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--color-text-soft)]">
+                        {result.improvementSummary.map((item) => (
+                          <li
+                            key={item}
+                            className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-3"
+                          >
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  </div>
+                ) : (
+                  <div className="mt-6 rounded-[1.5rem] border border-dashed border-[var(--color-border)] bg-white p-6 text-sm leading-7 text-[var(--color-text-soft)]">
+                    Upload or paste your resume, add the job description, and click{" "}
+                    <span className="font-semibold text-[var(--color-text)]">Improve Resume</span>.
+                    You will then see the ATS score, before/after bullet changes, safer keywords,
+                    and the final improved version here.
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </section>
         </div>
       </Container>
     </main>

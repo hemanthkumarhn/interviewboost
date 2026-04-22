@@ -4,6 +4,19 @@
 
 :root {
   color-scheme: light;
+  --color-bg: #f8f7f2;
+  --color-surface: #fffdf8;
+  --color-surface-soft: #f1f5f8;
+  --color-surface-accent: #e6f7f0;
+  --color-text: #0f172a;
+  --color-text-soft: #475569;
+  --color-border: #d7e1e8;
+  --color-brand: #123458;
+  --color-brand-strong: #0b3b66;
+  --color-accent: #10b981;
+  --color-accent-soft: #d1fae5;
+  --color-warm: #f59e0b;
+  --shadow-soft: 0 20px 60px rgba(18, 52, 88, 0.08);
 }
 
 html {
@@ -11,13 +24,16 @@ html {
 }
 
 body {
-  @apply bg-stone-950 text-stone-100 antialiased;
+  @apply antialiased;
+  background-color: var(--color-bg);
+  color: var(--color-text);
   background-image:
-    radial-gradient(circle at top, rgba(245, 158, 11, 0.18), transparent 28%),
-    radial-gradient(circle at 80% 20%, rgba(251, 191, 36, 0.12), transparent 22%),
-    linear-gradient(180deg, #10100d 0%, #12110f 42%, #0d0d0b 100%);
+    radial-gradient(circle at top left, rgba(16, 185, 129, 0.11), transparent 26%),
+    radial-gradient(circle at 80% 10%, rgba(18, 52, 88, 0.08), transparent 24%),
+    linear-gradient(180deg, #faf9f4 0%, #f8f7f2 46%, #f4f4ee 100%);
 }
 
 ::selection {
-  @apply bg-amber-300 text-stone-950;
+  background-color: rgba(16, 185, 129, 0.22);
+  color: var(--color-text);
 }
