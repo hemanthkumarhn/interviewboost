@@ -295,7 +295,7 @@ function extractSummary(value: ParsedMatchResumeResult["improvementSummary"]) {
   }
 
   if (typeof value === "string") {
-    return value
+    return (value as string)
       .split(/\n+/)
       .map((item) => item.replace(/^-+\s*/, "").trim())
       .filter(Boolean);
