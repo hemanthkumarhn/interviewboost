@@ -189,7 +189,7 @@ async function matchWithOpenAI(input: MatchResumeInput): Promise<MatchResumeResu
 
 async function matchWithGemini(input: MatchResumeInput): Promise<MatchResumeResult> {
   const apiKey = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_MODEL ?? "gemini-1.5-flash";
+  const model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
 
   if (!apiKey) {
     throw new Error("Missing GEMINI_API_KEY.");
