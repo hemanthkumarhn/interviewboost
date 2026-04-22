@@ -22,6 +22,8 @@ type OpenAIResponse = {
   };
 };
 
+type GroqResponse = OpenAIResponse;
+
 type GeminiResponse = {
   candidates?: Array<{
     content?: {
@@ -187,6 +189,52 @@ async function matchWithOpenAI(input: MatchResumeInput): Promise<MatchResumeResu
   return parseJsonResponse(content);
 }
 
+async function matchWithGroq(input: MatchResumeInput): Promise<MatchResumeResult> {
+  const apiKey = process.env.GROQ_API_KEY;
+  const model = process.env.GROQ_MODEL ?? "llama-3.1-8b-instant";
+
+  if (!apiKey) {
+    throw new Error("Missing GROQ_API_KEY.");
+  }
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.2,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You improve resumes conservatively, return valid JSON only, and never invent qualifications."
+        },
+        {
+          role: "user",
+          content: buildPrompt(input)
+        }
+      ]
+    })
+  });
+
+  const data = (await response.json()) as GroqResponse;
+
+  if (!response.ok) {
+    throw new Error(data.error?.message ?? "Groq request failed.");
+  }
+
+  const content = data.choices?.[0]?.message?.content;
+
+  if (!content) {
+    throw new Error("Groq returned an empty response.");
+  }
+
+  return parseJsonResponse(content);
+}
+
 async function matchWithGemini(input: MatchResumeInput): Promise<MatchResumeResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
@@ -237,6 +285,10 @@ async function matchWithGemini(input: MatchResumeInput): Promise<MatchResumeResu
 }
 
 export async function matchResume(input: MatchResumeInput): Promise<MatchResumeResult> {
+  if (process.env.GROQ_API_KEY) {
+    return matchWithGroq(input);
+  }
+
   if (process.env.OPENAI_API_KEY) {
     return matchWithOpenAI(input);
   }
@@ -246,6 +298,6 @@ export async function matchResume(input: MatchResumeInput): Promise<MatchResumeR
   }
 
   throw new Error(
-    "No AI provider configured. Set OPENAI_API_KEY or GEMINI_API_KEY in your environment."
+    "No AI provider configured. Set GROQ_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY in your environment."
   );
 }

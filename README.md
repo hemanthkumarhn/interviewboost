@@ -36,6 +36,11 @@ cp .env.local.example .env.local
 3. Add one AI provider to `.env.local`:
 
 ```bash
+GROQ_API_KEY=your_groq_api_key
+GROQ_MODEL=llama-3.1-8b-instant
+```
+
+```bash
 OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4o-mini
 ```
@@ -57,6 +62,11 @@ Open:
 
 - `http://localhost:3000`
 - `http://localhost:3000/resume`
+
+Provider priority in the app:
+1. Groq
+2. OpenAI
+3. Gemini
 
 ## Deploy to Vercel
 
