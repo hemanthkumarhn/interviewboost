@@ -47,14 +47,30 @@ export async function POST(request: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unexpected error while improving the resume.";
+    const errorId = `match_${Date.now().toString(36)}`;
+    const isConfigurationError =
+      message.includes("No AI provider configured") || message.includes("Missing ");
+    const isQuotaError =
+      message.includes("quota") ||
+      message.includes("Quota exceeded") ||
+      message.includes("rate limit");
+    const status = isConfigurationError ? 500 : 502;
 
-    const status = message.includes("No AI provider configured") || message.includes("Missing ")
-      ? 500
-      : 502;
+    console.error("[/api/match]", {
+      errorId,
+      status,
+      message,
+      isConfigurationError,
+      isQuotaError
+    });
+
+    const friendlyError = isQuotaError
+      ? `AI service is temporarily busy. Please try again shortly. Reference: ${errorId}`
+      : `Unable to improve the resume right now. Please try again in a moment. Reference: ${errorId}`;
 
     return NextResponse.json(
       {
-        error: message
+        error: friendlyError
       },
       { status }
     );
