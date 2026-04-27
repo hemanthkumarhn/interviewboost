@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Container } from "@/components/ui/container";
 import { LogoMark } from "@/components/ui/logo-mark";
+import { LandingAuthCta } from "@/components/landing-auth-cta";
 
 const problems = [
   "Your resume sounds generic, so recruiters cannot quickly connect you to the role.",
@@ -33,19 +34,18 @@ const highlights = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen py-6 sm:py-8">
+    <main className="relative min-h-screen py-6 sm:py-8">
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute left-[-8rem] top-[-6rem] h-60 w-60 rounded-full bg-[var(--color-accent)]/20 blur-3xl" />
+        <div className="absolute right-[-6rem] top-24 h-72 w-72 rounded-full bg-[var(--color-brand)]/20 blur-3xl" />
+      </div>
       <Container>
         <div className="overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-soft)]">
           <section className="border-b border-[var(--color-border)] px-6 py-6 sm:px-10 lg:px-14">
             <div className="flex items-center justify-between gap-4">
               <LogoMark />
               <div className="hidden items-center gap-3 sm:flex">
-                <Link
-                  href="/resume"
-                  className="rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-soft)] transition hover:border-[var(--color-brand)] hover:text-[var(--color-brand)]"
-                >
-                  Open app
-                </Link>
+                <LandingAuthCta compact />
                 <a
                   href="#how-it-works"
                   className="rounded-full bg-[var(--color-brand)] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--color-brand-strong)]"
@@ -69,15 +69,10 @@ export default function Home() {
                   version that is easier for recruiters and ATS systems to understand.
                 </p>
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                  <Link
-                    href="/resume"
-                    className="inline-flex items-center justify-center rounded-full bg-[var(--color-brand)] px-6 py-3 text-base font-semibold text-white transition hover:bg-[var(--color-brand-strong)]"
-                  >
-                    Improve my resume
-                  </Link>
+                  <LandingAuthCta />
                   <a
                     href="#proof"
-                    className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] px-6 py-3 text-base font-medium text-[var(--color-brand)] transition hover:border-[var(--color-brand)] hover:bg-[var(--color-surface-soft)]"
+                    className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white/80 px-6 py-3 text-base font-medium text-[var(--color-brand)] backdrop-blur transition hover:border-[var(--color-brand)] hover:bg-[var(--color-surface-soft)]"
                   >
                     View before vs after
                   </a>
@@ -94,8 +89,8 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface-soft)] p-5">
-                <div className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+              <div className="rounded-[1.75rem] border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-surface-soft)] to-white p-5 shadow-[0_25px_80px_rgba(18,52,88,0.12)]">
+                <div className="rounded-[1.5rem] border border-[var(--color-border)] bg-white/95 p-5 backdrop-blur">
                   <div className="flex items-center justify-between text-sm text-[var(--color-text-soft)]">
                     <span>Match preview</span>
                     <span className="rounded-full bg-[var(--color-accent-soft)] px-3 py-1 font-semibold text-[var(--color-accent)]">
@@ -250,12 +245,9 @@ export default function Home() {
                   description now.
                 </p>
               </div>
-              <Link
-                href="/resume"
-                className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-base font-semibold text-[var(--color-brand)] transition hover:bg-slate-100"
-              >
-                Open InterviewBoost
-              </Link>
+              <div className="[&>a]:!bg-white [&>a]:!text-[var(--color-brand)] [&>a]:hover:!bg-slate-100 [&>button]:!bg-white [&>button]:!text-[var(--color-brand)] [&>button]:hover:!bg-slate-100">
+                <LandingAuthCta />
+              </div>
             </div>
           </section>
         </div>

@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "sh -c 'if lsof -ti tcp:3000 >/dev/null 2>&1; then kill -9 $(lsof -ti tcp:3000); fi; PORT=3000 next dev'",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.104.1",
     "jspdf": "^4.2.1",
     "mammoth": "^1.12.0",
     "next": "14.2.33",
