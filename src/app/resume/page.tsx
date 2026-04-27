@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
+import type { User } from "@supabase/supabase-js";
 import { Container } from "@/components/ui/container";
 import { LogoMark } from "@/components/ui/logo-mark";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type BulletDiff = {
   before: string;
@@ -18,6 +20,16 @@ type MatchResponse = {
   missingKeywords: string[];
   atsMatchScore: number;
   improvementSummary: string[];
+};
+
+type ResumeDraftResponse = {
+  draft: {
+    id: string;
+    resumeText: string;
+    jobDescription: string;
+    updatedAt: string;
+  } | null;
+  error?: string;
 };
 
 type JobEntry = {
@@ -66,6 +78,11 @@ export default function ResumePage() {
   const [company, setCompany] = useState("");
   const [resumeFileName, setResumeFileName] = useState<string | null>(null);
   const [appliedJobs, setAppliedJobs] = useState<JobEntry[]>([]);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   useEffect(() => {
     const savedJobs = window.localStorage.getItem(JOBS_STORAGE_KEY);
@@ -85,6 +102,136 @@ export default function ResumePage() {
   useEffect(() => {
     window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(appliedJobs));
   }, [appliedJobs]);
+
+  useEffect(() => {
+    if (!supabase) {
+      setIsAuthLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const bootstrapSession = async () => {
+      const { data, error } = await supabase.auth.getUser();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        setAuthUser(null);
+      } else {
+        setAuthUser(data.user ?? null);
+      }
+
+      setIsAuthLoading(false);
+    };
+
+    bootstrapSession();
+
+    const { data: authState } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) {
+        return;
+      }
+      setAuthUser(session?.user ?? null);
+    });
+
+    return () => {
+      isMounted = false;
+      authState.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  useEffect(() => {
+    if (!authUser) {
+      return;
+    }
+
+    const syncDraft = async () => {
+      await fetch("/api/users/bootstrap", { method: "POST" });
+
+      const response = await fetch("/api/resumes", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data = (await response.json()) as ResumeDraftResponse;
+
+      if (!data.draft) {
+        return;
+      }
+
+      setResume((current) => current || data.draft?.resumeText || "");
+      setJobDescription((current) => current || data.draft?.jobDescription || "");
+    };
+
+    syncDraft();
+  }, [authUser]);
+
+  async function handleGoogleSignIn() {
+    if (!supabase) {
+      setMessage("Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and ANON_KEY.");
+      return;
+    }
+
+    const redirectTo = `${window.location.origin}/auth/callback?next=/resume`;
+
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo
+      }
+    });
+  }
+
+  async function handleSignOut() {
+    if (!supabase) {
+      return;
+    }
+
+    await supabase.auth.signOut();
+    setAuthUser(null);
+  }
+
+  async function handleSaveDraft() {
+    if (!authUser) {
+      setMessage("Please sign in with Google to save your resume draft.");
+      return;
+    }
+
+    setIsSavingDraft(true);
+
+    try {
+      const response = await fetch("/api/resumes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          resumeText: resume,
+          jobDescription
+        })
+      });
+
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Unable to save your draft.");
+      }
+
+      setMessage("Draft saved to your account.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to save your draft.");
+    } finally {
+      setIsSavingDraft(false);
+    }
+  }
 
   async function extractPdfText(file: File) {
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
@@ -433,6 +580,36 @@ export default function ResumePage() {
                     Pro
                   </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleSaveDraft}
+                  disabled={isSavingDraft || isAuthLoading || !authUser}
+                  className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--color-brand)] transition hover:bg-[var(--color-surface-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSavingDraft ? "Saving..." : "Save draft"}
+                </button>
+                {authUser ? (
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] px-5 py-3 text-sm font-medium text-[var(--color-text-soft)] transition hover:bg-[var(--color-surface-soft)]"
+                  >
+                    Sign out
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    disabled={isAuthLoading || !supabase}
+                    className="inline-flex items-center justify-center rounded-full bg-[var(--color-brand)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-brand-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isAuthLoading
+                      ? "Checking session..."
+                      : supabase
+                        ? "Sign in with Google"
+                        : "Google sign-in unavailable"}
+                  </button>
+                )}
               </div>
             </div>
           </section>

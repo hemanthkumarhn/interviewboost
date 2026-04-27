@@ -33,7 +33,20 @@ npm install
 cp .env.local.example .env.local
 ```
 
-3. Add one AI provider to `.env.local`:
+3. Add Supabase + one AI provider to `.env.local`:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Apply database schema in Supabase SQL editor:
+
+```sql
+-- copy everything from supabase/schema.sql
+```
+
+Then add one AI provider:
 
 ```bash
 GROQ_API_KEY=your_groq_api_key
@@ -62,6 +75,10 @@ Open:
 
 - `http://localhost:3000`
 - `http://localhost:3000/resume`
+
+For Google sign-in, enable Google provider in Supabase Auth and set:
+- Site URL: `http://localhost:3000`
+- Redirect URL: `http://localhost:3000/auth/callback`
 
 Provider priority in the app:
 1. Groq

@@ -43,7 +43,9 @@ type GeminiResponse = {
   };
 };
 
-type ParsedMatchResumeResult = Partial<MatchResumeResult> & {
+type ParsedMatchResumeResult = Partial<
+  Omit<MatchResumeResult, "improvementSummary" | "beforeAfterBullets">
+> & {
   improvementSummary?: string[] | string;
   beforeAfterBullets?: Array<Partial<BulletDiff>>;
 };
