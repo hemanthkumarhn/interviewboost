@@ -528,15 +528,19 @@ export default function ResumePage() {
   }
 
   return (
-    <main className="min-h-screen py-6 sm:py-8">
+    <main className="relative min-h-screen py-6 sm:py-8">
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute left-[-9rem] top-[-6rem] h-64 w-64 rounded-full bg-[var(--color-accent)]/20 blur-3xl" />
+        <div className="absolute right-[-7rem] top-28 h-72 w-72 rounded-full bg-[var(--color-brand)]/20 blur-3xl" />
+      </div>
       <Container>
-        <div className="overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-soft)]">
+        <div className="overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_24px_90px_rgba(18,52,88,0.16)]">
           <section className="border-b border-[var(--color-border)] px-6 py-6 sm:px-10 lg:px-14">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <LogoMark />
                 <div className="mt-5 max-w-2xl">
-                  <span className="inline-flex rounded-full border border-[var(--color-accent)]/20 bg-[var(--color-accent-soft)] px-4 py-2 text-sm font-medium text-[var(--color-brand)]">
+                  <span className="inline-flex rounded-full border border-[var(--color-accent)]/20 bg-[var(--color-accent-soft)]/80 px-4 py-2 text-sm font-medium text-[var(--color-brand)] backdrop-blur">
                     Upload, compare, score, and export
                   </span>
                   <h1 className="mt-5 text-3xl font-semibold tracking-[-0.03em] text-[var(--color-text)] sm:text-5xl">
@@ -552,7 +556,7 @@ export default function ResumePage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Link
                   href="/"
-                  className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] px-5 py-3 text-sm font-medium text-[var(--color-brand)] transition hover:bg-[var(--color-surface-soft)]"
+                  className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-5 py-3 text-sm font-medium text-[var(--color-brand)] transition hover:border-[var(--color-brand)]/30 hover:bg-[var(--color-surface-soft)]"
                 >
                   Back to home
                 </Link>
@@ -584,7 +588,7 @@ export default function ResumePage() {
                   type="button"
                   onClick={handleSaveDraft}
                   disabled={isSavingDraft || isAuthLoading || !authUser}
-                  className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--color-brand)] transition hover:bg-[var(--color-surface-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--color-brand)] transition hover:border-[var(--color-brand)]/30 hover:bg-[var(--color-surface-soft)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSavingDraft ? "Saving..." : "Save draft"}
                 </button>
@@ -592,7 +596,7 @@ export default function ResumePage() {
                   <button
                     type="button"
                     onClick={handleSignOut}
-                    className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] px-5 py-3 text-sm font-medium text-[var(--color-text-soft)] transition hover:bg-[var(--color-surface-soft)]"
+                    className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-5 py-3 text-sm font-medium text-[var(--color-text-soft)] transition hover:bg-[var(--color-surface-soft)]"
                   >
                     Sign out
                   </button>
@@ -614,10 +618,10 @@ export default function ResumePage() {
             </div>
           </section>
 
-          <section className="px-6 py-8 sm:px-10 lg:px-14">
+          <section className="bg-gradient-to-b from-white/40 to-transparent px-6 py-8 sm:px-10 lg:px-14">
             <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
               <div className="grid gap-6">
-                <section className="rounded-[1.75rem] border border-[var(--color-border)] bg-white p-6">
+                <section className="rounded-[1.75rem] border border-[var(--color-border)] bg-white/95 p-6 shadow-[0_12px_34px_rgba(15,23,42,0.07)] backdrop-blur">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h2 className="text-xl font-semibold text-[var(--color-text)]">Resume Input</h2>
@@ -625,7 +629,7 @@ export default function ResumePage() {
                         Paste text directly or upload a PDF, DOCX, or TXT resume.
                       </p>
                     </div>
-                    <label className="inline-flex cursor-pointer items-center justify-center rounded-full bg-[var(--color-brand)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-brand-strong)]">
+                    <label className="inline-flex cursor-pointer items-center justify-center rounded-full bg-[var(--color-brand)] px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(18,52,88,0.25)] transition hover:bg-[var(--color-brand-strong)]">
                       {isParsingResume ? "Reading resume..." : "Upload resume"}
                       <input
                         type="file"
@@ -637,7 +641,7 @@ export default function ResumePage() {
                     </label>
                   </div>
 
-                  <div className="mt-5 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-4 text-sm text-[var(--color-text-soft)]">
+                  <div className="mt-5 rounded-2xl border border-dashed border-[var(--color-border)] bg-gradient-to-br from-[var(--color-surface-soft)] to-white px-4 py-4 text-sm text-[var(--color-text-soft)]">
                     {resumeFileName ? `Loaded file: ${resumeFileName}` : "No file uploaded yet."}
                   </div>
 
@@ -654,7 +658,7 @@ export default function ResumePage() {
                   </label>
                 </section>
 
-                <section className="rounded-[1.75rem] border border-[var(--color-border)] bg-white p-6">
+                <section className="rounded-[1.75rem] border border-[var(--color-border)] bg-white/95 p-6 shadow-[0_12px_34px_rgba(15,23,42,0.07)] backdrop-blur">
                   <h2 className="text-xl font-semibold text-[var(--color-text)]">Job Description</h2>
                   <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
                     Paste the role description so InterviewBoost can tailor your resume to it.
@@ -669,7 +673,7 @@ export default function ResumePage() {
                   </label>
                 </section>
 
-                <section className="rounded-[1.75rem] border border-[var(--color-border)] bg-white p-6">
+                <section className="rounded-[1.75rem] border border-[var(--color-border)] bg-white/95 p-6 shadow-[0_12px_34px_rgba(15,23,42,0.07)] backdrop-blur">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <h2 className="text-lg font-semibold text-[var(--color-text)]">Applied Jobs</h2>
@@ -707,7 +711,7 @@ export default function ResumePage() {
                 </section>
               </div>
 
-              <div className="rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface-soft)] p-5 sm:p-6">
+              <div className="rounded-[1.75rem] border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-surface-soft)] to-white p-5 shadow-[0_20px_50px_rgba(18,52,88,0.13)] sm:p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-semibold text-[var(--color-text)]">Result Preview</h2>
@@ -715,7 +719,7 @@ export default function ResumePage() {
                       Review ATS score, bullet-level changes, and safer keywords before exporting.
                     </p>
                   </div>
-                  <span className="rounded-full border border-[var(--color-border)] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-text-soft)]">
+                  <span className="rounded-full border border-[var(--color-border)] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-text-soft)] shadow-sm">
                     AI Output
                   </span>
                 </div>
@@ -726,7 +730,7 @@ export default function ResumePage() {
                       type="button"
                       onClick={handleImproveResume}
                       disabled={isLoading || isParsingResume || !resume.trim() || !jobDescription.trim()}
-                      className="inline-flex min-w-[220px] items-center justify-center gap-3 rounded-full bg-[var(--color-brand)] px-6 py-3 text-base font-semibold text-white transition hover:bg-[var(--color-brand-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex min-w-[220px] items-center justify-center gap-3 rounded-full bg-[var(--color-brand)] px-6 py-3 text-base font-semibold text-white shadow-[0_10px_24px_rgba(18,52,88,0.25)] transition hover:bg-[var(--color-brand-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isLoading ? (
                         <>
@@ -742,7 +746,7 @@ export default function ResumePage() {
                       type="button"
                       onClick={handleApplyChanges}
                       disabled={!result || isLoading}
-                      className="inline-flex min-w-[180px] items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-6 py-3 text-base font-semibold text-[var(--color-brand)] transition hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex min-w-[180px] items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-6 py-3 text-base font-semibold text-[var(--color-brand)] transition hover:border-[var(--color-brand)]/30 hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Apply changes
                     </button>
@@ -753,7 +757,7 @@ export default function ResumePage() {
                       type="button"
                       onClick={handleImproveAgain}
                       disabled={isLoading || !result}
-                      className="inline-flex w-full items-center justify-center rounded-full border border-[var(--color-brand)]/10 bg-white px-6 py-3 text-sm font-semibold text-[var(--color-brand)] transition hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex w-full items-center justify-center rounded-full border border-[var(--color-brand)]/20 bg-white px-6 py-3 text-sm font-semibold text-[var(--color-brand)] transition hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Improve again
                     </button>
@@ -762,14 +766,14 @@ export default function ResumePage() {
                       type="button"
                       onClick={handleDownloadPdf}
                       disabled={!result || isLoading}
-                      className="inline-flex w-full items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-6 py-3 text-sm font-semibold text-[var(--color-text)] transition hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex w-full items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-6 py-3 text-sm font-semibold text-[var(--color-text)] transition hover:border-[var(--color-brand)]/20 hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Download PDF
                     </button>
                   </div>
 
                   {message ? (
-                    <div className="rounded-2xl border border-[var(--color-border)] bg-white px-4 py-4 text-sm text-[var(--color-text-soft)]">
+                    <div className="rounded-2xl border border-[var(--color-border)] bg-white px-4 py-4 text-sm text-[var(--color-text-soft)] shadow-sm">
                       {message}
                     </div>
                   ) : null}
@@ -781,7 +785,7 @@ export default function ResumePage() {
                   ) : null}
 
                   {result ? (
-                    <div className="rounded-2xl border border-[var(--color-brand)]/10 bg-white px-4 py-4">
+                    <div className="rounded-2xl border border-[var(--color-brand)]/15 bg-white px-4 py-4 shadow-sm">
                       <p className="text-sm font-medium text-[var(--color-brand)]">
                         Most users improve 2-3 times before getting results
                       </p>
@@ -796,7 +800,7 @@ export default function ResumePage() {
                   ) : null}
 
                   {showJobPrompt ? (
-                    <section className="rounded-[1.25rem] border border-[var(--color-accent)]/10 bg-white p-4">
+                    <section className="rounded-[1.25rem] border border-[var(--color-accent)]/15 bg-white p-4 shadow-sm">
                       <h3 className="text-base font-semibold text-[var(--color-text)]">
                         Did you apply for this job?
                       </h3>
@@ -839,7 +843,7 @@ export default function ResumePage() {
 
                 {result ? (
                   <div className="mt-6 grid gap-5">
-                    <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                    <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <h3 className="text-lg font-semibold text-[var(--color-text)]">ATS Match Score</h3>
@@ -867,7 +871,7 @@ export default function ResumePage() {
                       </div>
                     </section>
 
-                    <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                    <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
                       <h3 className="text-lg font-semibold text-[var(--color-text)]">Before vs After</h3>
                       <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
                         This view shows exactly how each bullet changed.
@@ -905,7 +909,7 @@ export default function ResumePage() {
                       </div>
                     </section>
 
-                    <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                    <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
                       <h3 className="text-lg font-semibold text-[var(--color-text)]">Improved Resume Text</h3>
                       <pre className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--color-text-soft)]">
                         {result.improvedText}
@@ -913,7 +917,7 @@ export default function ResumePage() {
                     </section>
 
                     <div className="grid gap-5 lg:grid-cols-2">
-                      <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                      <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
                         <h3 className="text-lg font-semibold text-[var(--color-text)]">Keywords Used Safely</h3>
                         <div className="mt-4 flex flex-wrap gap-3">
                           {result.addedKeywords.length > 0 ? (
@@ -933,7 +937,7 @@ export default function ResumePage() {
                         </div>
                       </section>
 
-                      <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                      <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
                         <h3 className="text-lg font-semibold text-[var(--color-text)]">Missing Keywords</h3>
                         <div className="mt-4 flex flex-wrap gap-3">
                           {result.missingKeywords.length > 0 ? (
@@ -954,7 +958,7 @@ export default function ResumePage() {
                       </section>
                     </div>
 
-                    <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                    <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
                       <h3 className="text-lg font-semibold text-[var(--color-text)]">Improvement Summary</h3>
                       <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--color-text-soft)]">
                         {result.improvementSummary.map((item) => (
@@ -969,7 +973,7 @@ export default function ResumePage() {
                     </section>
                   </div>
                 ) : (
-                  <div className="mt-6 rounded-[1.5rem] border border-dashed border-[var(--color-border)] bg-white p-6 text-sm leading-7 text-[var(--color-text-soft)]">
+                  <div className="mt-6 rounded-[1.5rem] border border-dashed border-[var(--color-border)] bg-white p-6 text-sm leading-7 text-[var(--color-text-soft)] shadow-sm">
                     Upload or paste your resume, add the job description, and click{" "}
                     <span className="font-semibold text-[var(--color-text)]">Improve Resume</span>.
                     You will then see the ATS score, before/after bullet changes, safer keywords,
