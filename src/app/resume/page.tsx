@@ -39,7 +39,51 @@ type JobEntry = {
   status: "Applied";
 };
 
+type ResumeBuilderState = {
+  fullName: string;
+  targetRole: string;
+  location: string;
+  yearsExperience: string;
+  summary: string;
+  skills: string;
+  recentCompany: string;
+  recentTitle: string;
+  achievementOne: string;
+  achievementTwo: string;
+  education: string;
+};
+
+type PdfTemplateId = "classic" | "modern" | "executive" | "emerald" | "minimal";
+type ResumeSection = {
+  heading: string;
+  lines: string[];
+};
+
 const JOBS_STORAGE_KEY = "interviewboost-applied-jobs";
+const PDF_TEMPLATES: Array<{
+  id: PdfTemplateId;
+  name: string;
+  accent: [number, number, number];
+  fill: [number, number, number];
+  summary: string;
+}> = [
+  { id: "classic", name: "Classic", accent: [18, 52, 88], fill: [241, 245, 249], summary: "Traditional one-column recruiter format" },
+  { id: "modern", name: "Modern", accent: [17, 94, 89], fill: [236, 253, 245], summary: "Balanced contemporary layout with stronger section framing" },
+  { id: "executive", name: "Executive", accent: [30, 41, 59], fill: [241, 245, 249], summary: "Formal business look with structured headings" },
+  { id: "emerald", name: "Emerald", accent: [5, 150, 105], fill: [220, 252, 231], summary: "Brighter premium style for product and tech roles" },
+  { id: "minimal", name: "Minimal", accent: [71, 85, 105], fill: [248, 250, 252], summary: "Clean ATS-first layout with very light ornamentation" }
+];
+
+const DEFAULT_SECTION_ORDER = [
+  "PROFILE",
+  "SUMMARY",
+  "SKILLS",
+  "EXPERIENCE",
+  "EMPLOYMENT HISTORY",
+  "PROJECTS",
+  "EDUCATION",
+  "CERTIFICATIONS"
+];
 
 function scoreLabel(score: number) {
   if (score >= 80) {
@@ -65,6 +109,55 @@ function scoreTone(score: number) {
   return "text-rose-700 bg-rose-100";
 }
 
+function parseResumeSections(text: string): ResumeSection[] {
+  const lines = text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const sections: ResumeSection[] = [];
+  let currentSection: ResumeSection | null = null;
+
+  for (const line of lines) {
+    const isHeading =
+      /^[A-Z][A-Z\s/&-]{2,}$/.test(line) ||
+      DEFAULT_SECTION_ORDER.includes(line.toUpperCase());
+
+    if (isHeading) {
+      currentSection = {
+        heading: line.toUpperCase(),
+        lines: []
+      };
+      sections.push(currentSection);
+      continue;
+    }
+
+    if (!currentSection) {
+      currentSection = {
+        heading: "PROFILE",
+        lines: []
+      };
+      sections.push(currentSection);
+    }
+
+    currentSection.lines.push(line);
+  }
+
+  return sections.filter((section) => section.lines.length > 0);
+}
+
+function formatResumeText(text: string) {
+  const sections = parseResumeSections(text);
+
+  if (sections.length === 0) {
+    return text.trim();
+  }
+
+  return sections
+    .map((section) => `${section.heading}\n${section.lines.join("\n")}`)
+    .join("\n\n")
+    .trim();
+}
+
 export default function ResumePage() {
   const [resume, setResume] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -76,8 +169,24 @@ export default function ResumePage() {
   const [showJobPrompt, setShowJobPrompt] = useState(false);
   const [jobRole, setJobRole] = useState("");
   const [company, setCompany] = useState("");
+  const [jobDescriptionUrl, setJobDescriptionUrl] = useState("");
+  const [isFetchingJobUrl, setIsFetchingJobUrl] = useState(false);
   const [resumeFileName, setResumeFileName] = useState<string | null>(null);
   const [appliedJobs, setAppliedJobs] = useState<JobEntry[]>([]);
+  const [pdfTemplate, setPdfTemplate] = useState<PdfTemplateId>("classic");
+  const [builderForm, setBuilderForm] = useState<ResumeBuilderState>({
+    fullName: "",
+    targetRole: "",
+    location: "",
+    yearsExperience: "",
+    summary: "",
+    skills: "",
+    recentCompany: "",
+    recentTitle: "",
+    achievementOne: "",
+    achievementTwo: "",
+    education: ""
+  });
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -167,7 +276,7 @@ export default function ResumePage() {
         return;
       }
 
-      setResume((current) => current || data.draft?.resumeText || "");
+      setResume((current) => current || formatResumeText(data.draft?.resumeText || ""));
       setJobDescription((current) => current || data.draft?.jobDescription || "");
     };
 
@@ -233,53 +342,6 @@ export default function ResumePage() {
     }
   }
 
-  async function extractPdfText(file: File) {
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const arrayBuffer = await file.arrayBuffer();
-    pdfjs.GlobalWorkerOptions.workerSrc = "";
-    const pdf = await pdfjs.getDocument({
-      data: new Uint8Array(arrayBuffer)
-    }).promise;
-
-    const pages: string[] = [];
-
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-      const page = await pdf.getPage(pageNumber);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item) => ("str" in item ? item.str : ""))
-        .join(" ");
-      pages.push(pageText);
-    }
-
-    return pages.join("\n");
-  }
-
-  async function extractDocxText(file: File) {
-    const mammoth = await import("mammoth/mammoth.browser");
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    return result.value;
-  }
-
-  async function extractResumeText(file: File) {
-    const fileName = file.name.toLowerCase();
-
-    if (fileName.endsWith(".txt")) {
-      return file.text();
-    }
-
-    if (fileName.endsWith(".pdf")) {
-      return extractPdfText(file);
-    }
-
-    if (fileName.endsWith(".docx")) {
-      return extractDocxText(file);
-    }
-
-    throw new Error("Please upload a PDF, DOCX, or TXT resume.");
-  }
-
   async function handleResumeUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
@@ -291,17 +353,40 @@ export default function ResumePage() {
     setMessage(null);
 
     try {
-      const text = await extractResumeText(file);
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
 
-      if (!text.trim()) {
-        throw new Error(
-          "We could not extract readable text from this file. Try a text-based PDF, DOCX, or TXT resume."
-        );
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+
+      const base64 = window.btoa(binary);
+
+      const response = await fetch("/api/resume-upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          base64
+        })
+      });
+
+      const data = (await response.json()) as {
+        fileName?: string;
+        text?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !data.text) {
+        throw new Error(data.error ?? "Unable to read that resume file.");
       }
 
-      setResume(text.trim());
-      setResumeFileName(file.name);
-      setMessage(`Uploaded ${file.name} successfully.`);
+      setResume(formatResumeText(data.text.trim()));
+      setResumeFileName(data.fileName ?? file.name);
+      setMessage(`Uploaded ${data.fileName ?? file.name} successfully.`);
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Unable to read that resume file."
@@ -310,6 +395,91 @@ export default function ResumePage() {
       setIsParsingResume(false);
       event.target.value = "";
     }
+  }
+
+  async function handleFetchJobDescriptionFromUrl() {
+    if (!jobDescriptionUrl.trim()) {
+      setMessage("Please enter a job description URL first.");
+      return;
+    }
+
+    setIsFetchingJobUrl(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/job-description-url", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          url: jobDescriptionUrl
+        })
+      });
+
+      const data = (await response.json()) as { text?: string; error?: string };
+
+      if (!response.ok || !data.text) {
+        throw new Error(data.error ?? "Unable to fetch the job description from that URL.");
+      }
+
+      setJobDescription(data.text.trim());
+      setMessage("Job description imported from URL successfully.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to fetch the job description from that URL."
+      );
+    } finally {
+      setIsFetchingJobUrl(false);
+    }
+  }
+
+  function handleBuilderChange(
+    field: keyof ResumeBuilderState,
+    value: string
+  ) {
+    setBuilderForm((current) => ({
+      ...current,
+      [field]: value
+    }));
+  }
+
+  function handleGenerateResumeDraft() {
+    const draftSections = [
+      builderForm.fullName.trim(),
+      builderForm.targetRole.trim()
+        ? `${builderForm.targetRole.trim()}${builderForm.location.trim() ? ` | ${builderForm.location.trim()}` : ""}`
+        : builderForm.location.trim(),
+      builderForm.summary.trim()
+        ? `PROFILE\n${builderForm.summary.trim()}`
+        : "",
+      builderForm.skills.trim()
+        ? `SKILLS\n${builderForm.skills
+            .split(",")
+            .map((skill) => skill.trim())
+            .filter(Boolean)
+            .join(", ")}`
+        : "",
+      builderForm.recentCompany.trim() || builderForm.recentTitle.trim()
+        ? `EXPERIENCE\n${builderForm.recentTitle.trim() || "Role"}${builderForm.recentCompany.trim() ? `, ${builderForm.recentCompany.trim()}` : ""}${builderForm.yearsExperience.trim() ? `\nExperience: ${builderForm.yearsExperience.trim()}` : ""}\n• ${builderForm.achievementOne.trim() || "Describe one strong contribution or project."}\n• ${builderForm.achievementTwo.trim() || "Describe another achievement, feature, or responsibility."}`
+        : "",
+      builderForm.education.trim()
+        ? `EDUCATION\n${builderForm.education.trim()}`
+        : ""
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    if (!draftSections.trim()) {
+      setMessage("Add a few details in the quick builder before generating a resume draft.");
+      return;
+    }
+
+    setResume(formatResumeText(draftSections.trim()));
+    setResumeFileName("Generated from quick builder");
+    setMessage("Resume draft generated from the quick builder.");
   }
 
   async function runImprovement(mode: "initial" | "refine") {
@@ -369,7 +539,7 @@ export default function ResumePage() {
       return;
     }
 
-    setResume(result.improvedText);
+    setResume(formatResumeText(result.improvedText));
     setMessage("Improved text applied to your resume.");
   }
 
@@ -384,6 +554,10 @@ export default function ResumePage() {
     if (!result) {
       return;
     }
+
+    const selectedTemplate =
+      PDF_TEMPLATES.find((template) => template.id === pdfTemplate) ?? PDF_TEMPLATES[0];
+    const sections = parseResumeSections(result.improvedText);
 
     const doc = new jsPDF({
       format: "a4",
@@ -437,6 +611,32 @@ export default function ResumePage() {
       y += gapAfter;
     };
 
+    const addSectionCard = (heading: string, lines: string[]) => {
+      addPageIfNeeded(48);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, y, maxWidth, 34, 12, 12, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(...selectedTemplate.accent);
+      doc.text(heading, margin + 14, y + 21);
+      y += 46;
+      doc.setFont("helvetica", "normal");
+      lines.forEach((line) => {
+        addWrappedBlock(line, {
+          fontSize: 11,
+          color: [30, 30, 30],
+          gapAfter: 8
+        });
+      });
+      y += 6;
+    };
+
+    doc.setFillColor(...selectedTemplate.fill);
+    doc.roundedRect(24, 24, pageWidth - 48, pageHeight - 48, 28, 28, "F");
+
+    doc.setFillColor(...selectedTemplate.accent);
+    doc.roundedRect(margin, margin, pageWidth - margin * 2, 72, 20, 20, "F");
+
     if (plan === "free") {
       doc.saveGraphicsState();
       doc.setTextColor(225, 225, 225);
@@ -449,44 +649,73 @@ export default function ResumePage() {
     }
 
     doc.setFont("helvetica", "bold");
-    addWrappedBlock("InterviewBoost Resume Export", {
-      fontSize: 20,
-      color: [15, 23, 42],
-      gapAfter: 10
-    });
-
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(selectedTemplate.id === "executive" ? 18 : 20);
+    doc.text("InterviewBoost Resume Export", margin + 16, margin + 30);
     doc.setFont("helvetica", "normal");
-    addWrappedBlock(`ATS Match Score: ${result.atsMatchScore}/100`, {
-      fontSize: 11,
-      color: [71, 85, 105],
-      gapAfter: 20
-    });
+    doc.setFontSize(10);
+    doc.text(`Template: ${selectedTemplate.name}`, margin + 16, margin + 50);
+    y = margin + 98;
 
-    doc.setFont("helvetica", "bold");
-    addWrappedBlock("Improved Resume", {
-      fontSize: 13,
-      color: [15, 23, 42],
-      gapAfter: 10
-    });
-
-    doc.setFont("helvetica", "normal");
-    result.improvedText
-      .split(/\n+/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .forEach((line) => {
-        addWrappedBlock(line, {
-          fontSize: 11,
-          color: [30, 30, 30],
-          gapAfter: 8
-        });
+    if (selectedTemplate.id === "classic" || selectedTemplate.id === "minimal") {
+      doc.setFont("helvetica", "bold");
+      addWrappedBlock("Resume Snapshot", {
+        fontSize: 20,
+        color: selectedTemplate.accent,
+        gapAfter: 10
       });
+
+      doc.setFont("helvetica", "normal");
+      addWrappedBlock(`ATS Match Score: ${result.atsMatchScore}/100`, {
+        fontSize: 11,
+        color: [71, 85, 105],
+        gapAfter: 20
+      });
+
+      sections.forEach((section) => {
+        addSectionCard(section.heading, section.lines);
+      });
+    } else if (selectedTemplate.id === "executive") {
+      doc.setFont("helvetica", "bold");
+      addWrappedBlock("Executive Resume Summary", {
+        fontSize: 18,
+        color: selectedTemplate.accent,
+        gapAfter: 8
+      });
+      doc.setFont("helvetica", "normal");
+      addWrappedBlock(
+        `ATS Match Score: ${result.atsMatchScore}/100 | Template optimized for formal business presentation`,
+        {
+          fontSize: 10,
+          color: [71, 85, 105],
+          gapAfter: 18
+        }
+      );
+      sections.forEach((section) => addSectionCard(section.heading, section.lines));
+    } else {
+      doc.setFont("helvetica", "bold");
+      addWrappedBlock("Modern Resume Layout", {
+        fontSize: 18,
+        color: selectedTemplate.accent,
+        gapAfter: 8
+      });
+      doc.setFont("helvetica", "normal");
+      addWrappedBlock(
+        `ATS Match Score: ${result.atsMatchScore}/100 | ${selectedTemplate.summary}`,
+        {
+          fontSize: 10,
+          color: [71, 85, 105],
+          gapAfter: 18
+        }
+      );
+      sections.forEach((section) => addSectionCard(section.heading, section.lines));
+    }
 
     if (result.addedKeywords.length > 0) {
       doc.setFont("helvetica", "bold");
       addWrappedBlock("Keywords Used Safely", {
         fontSize: 13,
-        color: [15, 23, 42],
+        color: selectedTemplate.accent,
         gapAfter: 10
       });
 
@@ -495,6 +724,24 @@ export default function ResumePage() {
         fontSize: 11,
         color: [30, 30, 30],
         gapAfter: 18
+      });
+    }
+
+    if (result.improvementSummary.length > 0) {
+      doc.setFont("helvetica", "bold");
+      addWrappedBlock("Improvement Summary", {
+        fontSize: 13,
+        color: selectedTemplate.accent,
+        gapAfter: 10
+      });
+
+      doc.setFont("helvetica", "normal");
+      result.improvementSummary.forEach((item) => {
+        addWrappedBlock(`• ${item}`, {
+          fontSize: 11,
+          color: [30, 30, 30],
+          gapAfter: 8
+        });
       });
     }
 
@@ -528,7 +775,7 @@ export default function ResumePage() {
   }
 
   return (
-    <main className="relative min-h-screen py-6 sm:py-8">
+    <main className="relative min-h-screen py-4 sm:py-6">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute left-[-9rem] top-[-6rem] h-64 w-64 rounded-full bg-[var(--color-accent)]/20 blur-3xl" />
         <div className="absolute right-[-7rem] top-28 h-72 w-72 rounded-full bg-[var(--color-brand)]/20 blur-3xl" />
@@ -618,15 +865,15 @@ export default function ResumePage() {
             </div>
           </section>
 
-          <section className="bg-gradient-to-b from-white/40 to-transparent px-6 py-8 sm:px-10 lg:px-14">
-            <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
+          <section className="bg-gradient-to-b from-white/40 to-transparent px-4 py-6 sm:px-8 lg:px-10 xl:px-12">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(460px,0.95fr)]">
               <div className="grid gap-6">
                 <section className="rounded-[1.75rem] border border-[var(--color-border)] bg-white/95 p-6 shadow-[0_12px_34px_rgba(15,23,42,0.07)] backdrop-blur">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h2 className="text-xl font-semibold text-[var(--color-text)]">Resume Input</h2>
-                      <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
-                        Paste text directly or upload a PDF, DOCX, or TXT resume.
+                      <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--color-text-soft)]">
+                        Paste text directly, upload a PDF, DOCX, or TXT resume, or generate a quick draft below. This panel is designed as your working area, so use it like a live editor instead of a single tiny form.
                       </p>
                     </div>
                     <label className="inline-flex cursor-pointer items-center justify-center rounded-full bg-[var(--color-brand)] px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(18,52,88,0.25)] transition hover:bg-[var(--color-brand-strong)]">
@@ -641,9 +888,9 @@ export default function ResumePage() {
                     </label>
                   </div>
 
-                  <div className="mt-5 rounded-2xl border border-dashed border-[var(--color-border)] bg-gradient-to-br from-[var(--color-surface-soft)] to-white px-4 py-4 text-sm text-[var(--color-text-soft)]">
-                    {resumeFileName ? `Loaded file: ${resumeFileName}` : "No file uploaded yet."}
-                  </div>
+                    <div className="mt-5 rounded-2xl border border-dashed border-[var(--color-border)] bg-gradient-to-br from-[var(--color-surface-soft)] to-white px-4 py-4 text-sm text-[var(--color-text-soft)]">
+                      {resumeFileName ? `Loaded file: ${resumeFileName}` : "No file uploaded yet."}
+                    </div>
 
                   <label className="mt-5 block">
                     <span className="mb-3 block text-sm font-medium text-[var(--color-text)]">
@@ -656,13 +903,121 @@ export default function ResumePage() {
                       className="min-h-[260px] w-full rounded-[1.5rem] border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4 text-base text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
                     />
                   </label>
+
+                  <div className="mt-6 rounded-[1.5rem] border border-[var(--color-border)] bg-[var(--color-surface-soft)] p-5">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-[var(--color-text)]">
+                          No resume yet? Use Quick Builder
+                        </h3>
+                      <p className="max-w-2xl text-sm leading-7 text-[var(--color-text-soft)]">
+                        Fill a few details and generate a starter resume draft instead of writing everything from scratch. This is useful for freshers or anyone who has experience details but not a prepared resume file.
+                      </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleGenerateResumeDraft}
+                        className="inline-flex items-center justify-center rounded-full border border-[var(--color-brand)]/20 bg-white px-4 py-2 text-sm font-semibold text-[var(--color-brand)] transition hover:bg-[var(--color-surface)]"
+                      >
+                        Generate draft
+                      </button>
+                    </div>
+
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                      <input
+                        value={builderForm.fullName}
+                        onChange={(event) => handleBuilderChange("fullName", event.target.value)}
+                        placeholder="Full name"
+                        className="rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                      />
+                      <input
+                        value={builderForm.targetRole}
+                        onChange={(event) => handleBuilderChange("targetRole", event.target.value)}
+                        placeholder="Target role"
+                        className="rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                      />
+                      <input
+                        value={builderForm.location}
+                        onChange={(event) => handleBuilderChange("location", event.target.value)}
+                        placeholder="Location"
+                        className="rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                      />
+                      <input
+                        value={builderForm.yearsExperience}
+                        onChange={(event) => handleBuilderChange("yearsExperience", event.target.value)}
+                        placeholder="Years of experience"
+                        className="rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                      />
+                    </div>
+
+                    <textarea
+                      value={builderForm.summary}
+                      onChange={(event) => handleBuilderChange("summary", event.target.value)}
+                      placeholder="Professional summary"
+                      className="mt-4 min-h-[110px] w-full rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                    />
+                    <input
+                      value={builderForm.skills}
+                      onChange={(event) => handleBuilderChange("skills", event.target.value)}
+                      placeholder="Skills separated by commas"
+                      className="mt-4 w-full rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                    />
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <input
+                        value={builderForm.recentTitle}
+                        onChange={(event) => handleBuilderChange("recentTitle", event.target.value)}
+                        placeholder="Most recent title"
+                        className="rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                      />
+                      <input
+                        value={builderForm.recentCompany}
+                        onChange={(event) => handleBuilderChange("recentCompany", event.target.value)}
+                        placeholder="Most recent company"
+                        className="rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                      />
+                    </div>
+                    <textarea
+                      value={builderForm.achievementOne}
+                      onChange={(event) => handleBuilderChange("achievementOne", event.target.value)}
+                      placeholder="Achievement or project highlight 1"
+                      className="mt-4 min-h-[90px] w-full rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                    />
+                    <textarea
+                      value={builderForm.achievementTwo}
+                      onChange={(event) => handleBuilderChange("achievementTwo", event.target.value)}
+                      placeholder="Achievement or project highlight 2"
+                      className="mt-4 min-h-[90px] w-full rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                    />
+                    <textarea
+                      value={builderForm.education}
+                      onChange={(event) => handleBuilderChange("education", event.target.value)}
+                      placeholder="Education details"
+                      className="mt-4 min-h-[90px] w-full rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                    />
+                  </div>
                 </section>
 
                 <section className="rounded-[1.75rem] border border-[var(--color-border)] bg-white/95 p-6 shadow-[0_12px_34px_rgba(15,23,42,0.07)] backdrop-blur">
                   <h2 className="text-xl font-semibold text-[var(--color-text)]">Job Description</h2>
-                  <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
-                    Paste the role description so InterviewBoost can tailor your resume to it.
+                  <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--color-text-soft)]">
+                    Paste the role description or import it from a public job URL. Public pages work best; if a site blocks extraction, you can still paste the content manually.
                   </p>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+                    <input
+                      value={jobDescriptionUrl}
+                      onChange={(event) => setJobDescriptionUrl(event.target.value)}
+                      placeholder="Paste a job URL"
+                      className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-slate-400 focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/10"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleFetchJobDescriptionFromUrl}
+                      disabled={isFetchingJobUrl}
+                      className="inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--color-brand)] transition hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isFetchingJobUrl ? "Fetching..." : "Import from URL"}
+                    </button>
+                  </div>
                   <label className="mt-5 block">
                     <textarea
                       value={jobDescription}
@@ -711,12 +1066,12 @@ export default function ResumePage() {
                 </section>
               </div>
 
-              <div className="rounded-[1.75rem] border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-surface-soft)] to-white p-5 shadow-[0_20px_50px_rgba(18,52,88,0.13)] sm:p-6">
+              <div className="rounded-[1.75rem] border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-surface-soft)] to-white p-5 shadow-[0_20px_50px_rgba(18,52,88,0.13)] sm:p-6 xl:sticky xl:top-6 xl:self-start">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-semibold text-[var(--color-text)]">Result Preview</h2>
                     <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
-                      Review ATS score, bullet-level changes, and safer keywords before exporting.
+                      Review ATS score, bullet-level changes, safer keywords, and the polished resume before exporting.
                     </p>
                   </div>
                   <span className="rounded-full border border-[var(--color-border)] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-text-soft)] shadow-sm">
@@ -770,6 +1125,29 @@ export default function ResumePage() {
                     >
                       Download PDF
                     </button>
+                  </div>
+
+                  <div className="rounded-2xl border border-[var(--color-border)] bg-white p-4 shadow-sm">
+                    <p className="text-sm font-semibold text-[var(--color-text)]">Choose PDF template</p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {PDF_TEMPLATES.map((template) => (
+                        <button
+                          key={template.id}
+                          type="button"
+                          onClick={() => setPdfTemplate(template.id)}
+                          className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                            pdfTemplate === template.id
+                              ? "border-[var(--color-brand)] bg-[var(--color-surface-soft)] text-[var(--color-brand)]"
+                              : "border-[var(--color-border)] bg-white text-[var(--color-text-soft)] hover:bg-[var(--color-surface)]"
+                          }`}
+                        >
+                          <span className="block font-semibold">{template.name}</span>
+                          <span className="mt-1 block text-xs leading-5">
+                            {template.summary}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {message ? (
