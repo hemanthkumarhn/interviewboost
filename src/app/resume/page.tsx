@@ -6,6 +6,11 @@ import { jsPDF } from "jspdf";
 import type { User } from "@supabase/supabase-js";
 import { Container } from "@/components/ui/container";
 import { LogoMark } from "@/components/ui/logo-mark";
+import {
+  formatResumeText,
+  parseResumeSections,
+  type ResumeSection
+} from "@/lib/resume-structure";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type BulletDiff = {
@@ -15,7 +20,9 @@ type BulletDiff = {
 
 type MatchResponse = {
   improvedText: string;
+  sectionedResume: ResumeSection[];
   beforeAfterBullets: BulletDiff[];
+  topKeywords: string[];
   addedKeywords: string[];
   missingKeywords: string[];
   atsMatchScore: number;
@@ -54,10 +61,7 @@ type ResumeBuilderState = {
 };
 
 type PdfTemplateId = "classic" | "modern" | "executive" | "emerald" | "minimal";
-type ResumeSection = {
-  heading: string;
-  lines: string[];
-};
+type PdfLayout = "single" | "split" | "banded";
 
 const JOBS_STORAGE_KEY = "interviewboost-applied-jobs";
 const PDF_TEMPLATES: Array<{
@@ -65,24 +69,16 @@ const PDF_TEMPLATES: Array<{
   name: string;
   accent: [number, number, number];
   fill: [number, number, number];
+  sidebar?: [number, number, number];
+  ink?: [number, number, number];
+  layout: PdfLayout;
   summary: string;
 }> = [
-  { id: "classic", name: "Classic", accent: [18, 52, 88], fill: [241, 245, 249], summary: "Traditional one-column recruiter format" },
-  { id: "modern", name: "Modern", accent: [17, 94, 89], fill: [236, 253, 245], summary: "Balanced contemporary layout with stronger section framing" },
-  { id: "executive", name: "Executive", accent: [30, 41, 59], fill: [241, 245, 249], summary: "Formal business look with structured headings" },
-  { id: "emerald", name: "Emerald", accent: [5, 150, 105], fill: [220, 252, 231], summary: "Brighter premium style for product and tech roles" },
-  { id: "minimal", name: "Minimal", accent: [71, 85, 105], fill: [248, 250, 252], summary: "Clean ATS-first layout with very light ornamentation" }
-];
-
-const DEFAULT_SECTION_ORDER = [
-  "PROFILE",
-  "SUMMARY",
-  "SKILLS",
-  "EXPERIENCE",
-  "EMPLOYMENT HISTORY",
-  "PROJECTS",
-  "EDUCATION",
-  "CERTIFICATIONS"
+  { id: "classic", name: "Classic", accent: [18, 52, 88], fill: [241, 245, 249], ink: [17, 24, 39], layout: "single", summary: "Traditional one-column recruiter format with clear hierarchy" },
+  { id: "modern", name: "Modern", accent: [17, 94, 89], fill: [236, 253, 245], sidebar: [233, 250, 245], ink: [15, 23, 42], layout: "split", summary: "Two-column contemporary layout for product, engineering, and growth roles" },
+  { id: "executive", name: "Executive", accent: [30, 41, 59], fill: [241, 245, 249], ink: [15, 23, 42], layout: "banded", summary: "Structured presentation with strong header bands for senior profiles" },
+  { id: "emerald", name: "Emerald", accent: [5, 150, 105], fill: [220, 252, 231], sidebar: [236, 253, 245], ink: [6, 78, 59], layout: "split", summary: "Brighter premium template with an ATS-safe sidebar layout" },
+  { id: "minimal", name: "Minimal", accent: [71, 85, 105], fill: [248, 250, 252], ink: [30, 41, 59], layout: "single", summary: "Lean ATS-first layout with quiet typography and spacing" }
 ];
 
 function scoreLabel(score: number) {
@@ -109,53 +105,54 @@ function scoreTone(score: number) {
   return "text-rose-700 bg-rose-100";
 }
 
-function parseResumeSections(text: string): ResumeSection[] {
-  const lines = text
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  const sections: ResumeSection[] = [];
-  let currentSection: ResumeSection | null = null;
+function splitSectionsForSidebar(sections: ResumeSection[]) {
+  const sidebarHeadings = new Set([
+    "PROFILE",
+    "SUMMARY",
+    "SKILLS",
+    "TECHNICAL SKILLS",
+    "EDUCATION",
+    "CERTIFICATIONS",
+    "ACHIEVEMENTS"
+  ]);
 
-  for (const line of lines) {
-    const isHeading =
-      /^[A-Z][A-Z\s/&-]{2,}$/.test(line) ||
-      DEFAULT_SECTION_ORDER.includes(line.toUpperCase());
+  return sections.reduce(
+    (accumulator, section) => {
+      if (sidebarHeadings.has(section.heading)) {
+        accumulator.sidebar.push(section);
+      } else {
+        accumulator.main.push(section);
+      }
 
-    if (isHeading) {
-      currentSection = {
-        heading: line.toUpperCase(),
-        lines: []
-      };
-      sections.push(currentSection);
-      continue;
+      return accumulator;
+    },
+    {
+      sidebar: [] as ResumeSection[],
+      main: [] as ResumeSection[]
     }
-
-    if (!currentSection) {
-      currentSection = {
-        heading: "PROFILE",
-        lines: []
-      };
-      sections.push(currentSection);
-    }
-
-    currentSection.lines.push(line);
-  }
-
-  return sections.filter((section) => section.lines.length > 0);
+  );
 }
 
-function formatResumeText(text: string) {
-  const sections = parseResumeSections(text);
+function inferResumeTitle(sections: ResumeSection[]) {
+  const profile = sections.find((section) => section.heading === "PROFILE");
+  const firstLine = profile?.lines[0] ?? "";
 
-  if (sections.length === 0) {
-    return text.trim();
+  if (firstLine && firstLine.length <= 80 && !firstLine.startsWith("•")) {
+    return firstLine;
   }
 
-  return sections
-    .map((section) => `${section.heading}\n${section.lines.join("\n")}`)
-    .join("\n\n")
-    .trim();
+  return "InterviewBoost Candidate";
+}
+
+function inferResumeTagline(sections: ResumeSection[]) {
+  const profile = sections.find((section) => section.heading === "PROFILE");
+
+  if (!profile) {
+    return "ATS-optimized resume tailored for the selected role";
+  }
+
+  const profileLines = profile.lines.slice(1, 3).join(" | ");
+  return profileLines || "ATS-optimized resume tailored for the selected role";
 }
 
 export default function ResumePage() {
@@ -353,26 +350,38 @@ export default function ResumePage() {
     setMessage(null);
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = "";
+      let response: Response;
 
-      bytes.forEach((byte) => {
-        binary += String.fromCharCode(byte);
-      });
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = "";
 
-      const base64 = window.btoa(binary);
+        bytes.forEach((byte) => {
+          binary += String.fromCharCode(byte);
+        });
 
-      const response = await fetch("/api/resume-upload", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          fileName: file.name,
-          base64
-        })
-      });
+        const base64 = window.btoa(binary);
+
+        response = await fetch("/api/resume-upload", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            fileName: file.name,
+            base64
+          })
+        });
+      } catch {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        response = await fetch("/api/resume-upload", {
+          method: "POST",
+          body: formData
+        });
+      }
 
       const data = (await response.json()) as {
         fileName?: string;
@@ -557,7 +566,13 @@ export default function ResumePage() {
 
     const selectedTemplate =
       PDF_TEMPLATES.find((template) => template.id === pdfTemplate) ?? PDF_TEMPLATES[0];
-    const sections = parseResumeSections(result.improvedText);
+    const sections =
+      result.sectionedResume.length > 0
+        ? result.sectionedResume
+        : parseResumeSections(result.improvedText);
+    const title = inferResumeTitle(sections);
+    const tagline = inferResumeTagline(sections);
+    const { sidebar, main } = splitSectionsForSidebar(sections);
 
     const doc = new jsPDF({
       format: "a4",
@@ -566,78 +581,15 @@ export default function ResumePage() {
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 48;
+    const margin = 42;
     const maxWidth = pageWidth - margin * 2;
     let y = margin;
 
-    const addPageIfNeeded = (extraHeight = 0) => {
-      if (y + extraHeight <= pageHeight - margin) {
+    const addWatermark = () => {
+      if (plan !== "free") {
         return;
       }
 
-      doc.addPage();
-      y = margin;
-
-      if (plan === "free") {
-        doc.saveGraphicsState();
-        doc.setTextColor(225, 225, 225);
-        doc.setFontSize(42);
-        doc.text("Made with InterviewBoost", pageWidth / 2, pageHeight / 2, {
-          align: "center",
-          angle: 35
-        });
-        doc.restoreGraphicsState();
-      }
-    };
-
-    const addWrappedBlock = (
-      text: string,
-      options: { fontSize?: number; color?: [number, number, number]; gapAfter?: number } = {}
-    ) => {
-      const fontSize = options.fontSize ?? 11;
-      const gapAfter = options.gapAfter ?? 16;
-
-      doc.setFontSize(fontSize);
-      doc.setTextColor(...(options.color ?? [30, 30, 30]));
-
-      const lines = doc.splitTextToSize(text, maxWidth) as string[];
-
-      lines.forEach((line) => {
-        addPageIfNeeded(fontSize + 8);
-        doc.text(line, margin, y);
-        y += fontSize + 6;
-      });
-
-      y += gapAfter;
-    };
-
-    const addSectionCard = (heading: string, lines: string[]) => {
-      addPageIfNeeded(48);
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(margin, y, maxWidth, 34, 12, 12, "F");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.setTextColor(...selectedTemplate.accent);
-      doc.text(heading, margin + 14, y + 21);
-      y += 46;
-      doc.setFont("helvetica", "normal");
-      lines.forEach((line) => {
-        addWrappedBlock(line, {
-          fontSize: 11,
-          color: [30, 30, 30],
-          gapAfter: 8
-        });
-      });
-      y += 6;
-    };
-
-    doc.setFillColor(...selectedTemplate.fill);
-    doc.roundedRect(24, 24, pageWidth - 48, pageHeight - 48, 28, 28, "F");
-
-    doc.setFillColor(...selectedTemplate.accent);
-    doc.roundedRect(margin, margin, pageWidth - margin * 2, 72, 20, 20, "F");
-
-    if (plan === "free") {
       doc.saveGraphicsState();
       doc.setTextColor(225, 225, 225);
       doc.setFontSize(42);
@@ -646,69 +598,173 @@ export default function ResumePage() {
         angle: 35
       });
       doc.restoreGraphicsState();
-    }
+    };
 
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(selectedTemplate.id === "executive" ? 18 : 20);
-    doc.text("InterviewBoost Resume Export", margin + 16, margin + 30);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Template: ${selectedTemplate.name}`, margin + 16, margin + 50);
-    y = margin + 98;
+    const addPageIfNeeded = (extraHeight = 0) => {
+      if (y + extraHeight <= pageHeight - margin) {
+        return;
+      }
 
-    if (selectedTemplate.id === "classic" || selectedTemplate.id === "minimal") {
+      doc.addPage();
+      y = margin;
+      addWatermark();
+    };
+
+    const addWrappedBlock = (
+      text: string,
+      options: {
+        x?: number;
+        width?: number;
+        fontSize?: number;
+        color?: [number, number, number];
+        gapAfter?: number;
+        lineHeight?: number;
+      } = {}
+    ) => {
+      const x = options.x ?? margin;
+      const width = options.width ?? maxWidth;
+      const fontSize = options.fontSize ?? 11;
+      const gapAfter = options.gapAfter ?? 16;
+      const lineHeight = options.lineHeight ?? fontSize + 5;
+
+      doc.setFontSize(fontSize);
+      doc.setTextColor(...(options.color ?? [30, 30, 30]));
+
+      const lines = doc.splitTextToSize(text, width) as string[];
+
+      lines.forEach((line) => {
+        addPageIfNeeded(lineHeight + 2);
+        doc.text(line, x, y);
+        y += lineHeight;
+      });
+
+      y += gapAfter;
+    };
+
+    const addSectionCard = (
+      heading: string,
+      lines: string[],
+      options: {
+        x?: number;
+        width?: number;
+        fill?: [number, number, number];
+        accent?: [number, number, number];
+      } = {}
+    ) => {
+      const x = options.x ?? margin;
+      const width = options.width ?? maxWidth;
+      const accent = options.accent ?? selectedTemplate.accent;
+      addPageIfNeeded(48);
+      doc.setFillColor(...(options.fill ?? [255, 255, 255]));
+      doc.roundedRect(x, y, width, 34, 12, 12, "F");
       doc.setFont("helvetica", "bold");
-      addWrappedBlock("Resume Snapshot", {
-        fontSize: 20,
-        color: selectedTemplate.accent,
-        gapAfter: 10
-      });
-
+      doc.setFontSize(11);
+      doc.setTextColor(...accent);
+      doc.text(heading, x + 14, y + 21);
+      y += 46;
       doc.setFont("helvetica", "normal");
-      addWrappedBlock(`ATS Match Score: ${result.atsMatchScore}/100`, {
-        fontSize: 11,
-        color: [71, 85, 105],
-        gapAfter: 20
+      lines.forEach((line) => {
+        addWrappedBlock(line, {
+          x,
+          width,
+          fontSize: 11,
+          color: selectedTemplate.ink ?? [30, 30, 30],
+          gapAfter: 8
+        });
       });
+      y += 6;
+    };
 
-      sections.forEach((section) => {
-        addSectionCard(section.heading, section.lines);
-      });
-    } else if (selectedTemplate.id === "executive") {
+    doc.setFillColor(...selectedTemplate.fill);
+    doc.roundedRect(24, 24, pageWidth - 48, pageHeight - 48, 28, 28, "F");
+    addWatermark();
+
+    if (selectedTemplate.layout === "split") {
+      const sidebarWidth = 160;
+      const gutter = 26;
+      const mainX = margin + sidebarWidth + gutter;
+      const mainWidth = pageWidth - mainX - margin;
+
+      doc.setFillColor(...(selectedTemplate.sidebar ?? selectedTemplate.fill));
+      doc.roundedRect(margin, margin, sidebarWidth, pageHeight - margin * 2, 18, 18, "F");
+      doc.setFillColor(...selectedTemplate.accent);
+      doc.roundedRect(mainX, margin, mainWidth, 86, 20, 20, "F");
+
       doc.setFont("helvetica", "bold");
-      addWrappedBlock("Executive Resume Summary", {
-        fontSize: 18,
-        color: selectedTemplate.accent,
-        gapAfter: 8
-      });
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(20);
+      doc.text(title, mainX + 18, margin + 30, { maxWidth: mainWidth - 36 });
       doc.setFont("helvetica", "normal");
-      addWrappedBlock(
-        `ATS Match Score: ${result.atsMatchScore}/100 | Template optimized for formal business presentation`,
-        {
-          fontSize: 10,
-          color: [71, 85, 105],
-          gapAfter: 18
-        }
-      );
-      sections.forEach((section) => addSectionCard(section.heading, section.lines));
+      doc.setFontSize(10);
+      doc.text(tagline, mainX + 18, margin + 50, { maxWidth: mainWidth - 36 });
+      doc.text(`ATS Match Score: ${result.atsMatchScore}/100`, mainX + 18, margin + 68);
+
+      let sidebarY = margin + 22;
+      doc.setTextColor(...(selectedTemplate.ink ?? [15, 23, 42]));
+      sidebar.forEach((section) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.text(section.heading, margin + 12, sidebarY);
+        sidebarY += 16;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9.5);
+        const lines = section.lines.flatMap((line) =>
+          doc.splitTextToSize(line, sidebarWidth - 24) as string[]
+        );
+        lines.forEach((line) => {
+          doc.text(line, margin + 12, sidebarY);
+          sidebarY += 12;
+        });
+        sidebarY += 12;
+      });
+
+      y = margin + 110;
+      main.forEach((section) => {
+        addSectionCard(section.heading, section.lines, {
+          x: mainX,
+          width: mainWidth,
+          fill: [255, 255, 255]
+        });
+      });
+    } else if (selectedTemplate.layout === "banded") {
+      doc.setFillColor(...selectedTemplate.accent);
+      doc.roundedRect(margin, margin, pageWidth - margin * 2, 86, 20, 20, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
+      doc.text(title, margin + 18, margin + 32);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(`${tagline} | ATS Match Score: ${result.atsMatchScore}/100`, margin + 18, margin + 54, {
+        maxWidth: maxWidth - 36
+      });
+      doc.text(selectedTemplate.summary, margin + 18, margin + 70, {
+        maxWidth: maxWidth - 36
+      });
+      y = margin + 112;
+      sections.forEach((section, index) => {
+        addSectionCard(section.heading, section.lines, {
+          fill: index % 2 === 0 ? [255, 255, 255] : [248, 250, 252]
+        });
+      });
     } else {
+      doc.setFillColor(...selectedTemplate.accent);
+      doc.roundedRect(margin, margin, pageWidth - margin * 2, 78, 20, 20, "F");
       doc.setFont("helvetica", "bold");
-      addWrappedBlock("Modern Resume Layout", {
-        fontSize: 18,
-        color: selectedTemplate.accent,
-        gapAfter: 8
-      });
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(20);
+      doc.text(title, margin + 16, margin + 30);
       doc.setFont("helvetica", "normal");
-      addWrappedBlock(
-        `ATS Match Score: ${result.atsMatchScore}/100 | ${selectedTemplate.summary}`,
-        {
-          fontSize: 10,
-          color: [71, 85, 105],
-          gapAfter: 18
-        }
-      );
-      sections.forEach((section) => addSectionCard(section.heading, section.lines));
+      doc.setFontSize(10);
+      doc.text(`${tagline} | ATS Match Score: ${result.atsMatchScore}/100`, margin + 16, margin + 52, {
+        maxWidth: maxWidth - 32
+      });
+      y = margin + 102;
+      sections.forEach((section) => {
+        addSectionCard(section.heading, section.lines, {
+          fill: [255, 255, 255]
+        });
+      });
     }
 
     if (result.addedKeywords.length > 0) {
@@ -742,6 +798,21 @@ export default function ResumePage() {
           color: [30, 30, 30],
           gapAfter: 8
         });
+      });
+    }
+
+    if (result.topKeywords.length > 0) {
+      doc.setFont("helvetica", "bold");
+      addWrappedBlock("Top Job Keywords", {
+        fontSize: 13,
+        color: selectedTemplate.accent,
+        gapAfter: 10
+      });
+      doc.setFont("helvetica", "normal");
+      addWrappedBlock(result.topKeywords.join(", "), {
+        fontSize: 11,
+        color: selectedTemplate.ink ?? [30, 30, 30],
+        gapAfter: 18
       });
     }
 
@@ -1071,7 +1142,7 @@ export default function ResumePage() {
                   <div>
                     <h2 className="text-xl font-semibold text-[var(--color-text)]">Result Preview</h2>
                     <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
-                      Review ATS score, bullet-level changes, safer keywords, and the polished resume before exporting.
+                      Review ATS score, section-level polish, safer keywords, and the polished resume before exporting.
                     </p>
                   </div>
                   <span className="rounded-full border border-[var(--color-border)] bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-text-soft)] shadow-sm">
@@ -1249,6 +1320,41 @@ export default function ResumePage() {
                       </div>
                     </section>
 
+                    <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+                      <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
+                        <h3 className="text-lg font-semibold text-[var(--color-text)]">Top Job Keywords</h3>
+                        <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
+                          The most important phrases the AI pulled from the job description.
+                        </p>
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          {result.topKeywords.length > 0 ? (
+                            result.topKeywords.map((keyword) => (
+                              <span
+                                key={keyword}
+                                className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-3 py-2 text-sm text-[var(--color-brand)]"
+                              >
+                                {keyword}
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-sm text-[var(--color-text-soft)]">
+                              No priority keywords were extracted for this run.
+                            </p>
+                          )}
+                        </div>
+                      </section>
+
+                      <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
+                        <h3 className="text-lg font-semibold text-[var(--color-text)]">Template fit</h3>
+                        <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
+                          {PDF_TEMPLATES.find((template) => template.id === pdfTemplate)?.summary}
+                        </p>
+                        <div className="mt-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-soft)] p-4 text-sm leading-7 text-[var(--color-text-soft)]">
+                          The export now changes layout as well as styling. Split templates create a sidebar, executive uses structured bands, and single-column templates stay ATS-first.
+                        </div>
+                      </section>
+                    </div>
+
                     <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
                       <h3 className="text-lg font-semibold text-[var(--color-text)]">Before vs After</h3>
                       <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
@@ -1288,10 +1394,27 @@ export default function ResumePage() {
                     </section>
 
                     <section className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
-                      <h3 className="text-lg font-semibold text-[var(--color-text)]">Improved Resume Text</h3>
-                      <pre className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--color-text-soft)]">
-                        {result.improvedText}
-                      </pre>
+                      <h3 className="text-lg font-semibold text-[var(--color-text)]">Structured Resume Output</h3>
+                      <p className="mt-2 text-sm leading-7 text-[var(--color-text-soft)]">
+                        This version is grouped into export-ready sections instead of one plain text block.
+                      </p>
+                      <div className="mt-5 grid gap-4">
+                        {result.sectionedResume.map((section) => (
+                          <div
+                            key={section.heading}
+                            className="rounded-[1.25rem] border border-[var(--color-border)] bg-[var(--color-surface-soft)] p-4"
+                          >
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand)]">
+                              {section.heading}
+                            </p>
+                            <div className="mt-3 space-y-2 text-sm leading-7 text-[var(--color-text-soft)]">
+                              {section.lines.map((line, index) => (
+                                <p key={`${section.heading}-${index}`}>{line}</p>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </section>
 
                     <div className="grid gap-5 lg:grid-cols-2">

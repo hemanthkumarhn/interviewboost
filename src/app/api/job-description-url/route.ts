@@ -2,6 +2,17 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+const JOB_BOARD_HOST_HINTS = [
+  "linkedin.com",
+  "naukri.com",
+  "indeed.com",
+  "greenhouse.io",
+  "lever.co",
+  "wellfound.com",
+  "foundit.in",
+  "workday.com"
+];
+
 function stripHtml(html: string) {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -15,6 +26,49 @@ function stripHtml(html: string) {
     .replace(/&gt;/gi, ">")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function extractJsonLdDescriptions(html: string) {
+  const matches = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+
+  return matches
+    .map((match) => match[1])
+    .flatMap((block) => {
+      try {
+        const parsed = JSON.parse(block) as Record<string, unknown> | Array<Record<string, unknown>>;
+        const records = Array.isArray(parsed) ? parsed : [parsed];
+
+        return records.flatMap((record) => {
+          const description = typeof record.description === "string" ? record.description : "";
+          const title = typeof record.title === "string" ? record.title : typeof record.name === "string" ? record.name : "";
+          return [title, description].filter(Boolean);
+        });
+      } catch {
+        return [];
+      }
+    })
+    .join("\n");
+}
+
+function extractMetaDescriptions(html: string) {
+  const metaMatches = [
+    ...html.matchAll(/<meta[^>]+(?:name|property)=["'](?:description|og:description|twitter:description)["'][^>]+content=["']([^"']+)["'][^>]*>/gi)
+  ];
+
+  return metaMatches.map((match) => match[1]).join("\n");
+}
+
+function extractJobLikeText(html: string) {
+  const jsonLd = extractJsonLdDescriptions(html);
+  const meta = extractMetaDescriptions(html);
+  const bodyText = stripHtml(html);
+
+  return [jsonLd, meta, bodyText]
+    .filter(Boolean)
+    .join("\n")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 18000);
 }
 
 export async function POST(request: Request) {
@@ -53,22 +107,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const response = await fetch(parsedUrl.toString(), {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; InterviewBoostBot/1.0; +https://interviewboost.in)"
-      },
-      redirect: "follow"
-    });
-
     let text = "";
+    const shouldPreferProxy = JOB_BOARD_HOST_HINTS.some((host) =>
+      parsedUrl.hostname.includes(host)
+    );
 
-    if (response.ok) {
-      const contentType = response.headers.get("content-type") ?? "";
+    if (!shouldPreferProxy) {
+      const response = await fetch(parsedUrl.toString(), {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (compatible; InterviewBoostBot/1.0; +https://interviewboost.in)"
+        },
+        redirect: "follow"
+      });
 
-      if (contentType.includes("text/html")) {
-        const html = await response.text();
-        text = stripHtml(html).slice(0, 15000);
+      if (response.ok) {
+        const contentType = response.headers.get("content-type") ?? "";
+
+        if (contentType.includes("text/html")) {
+          const html = await response.text();
+          text = extractJobLikeText(html);
+        }
       }
     }
 
@@ -82,7 +141,7 @@ export async function POST(request: Request) {
       });
 
       if (proxyResponse.ok) {
-        text = (await proxyResponse.text()).replace(/\s+/g, " ").trim().slice(0, 15000);
+        text = (await proxyResponse.text()).replace(/\s+/g, " ").trim().slice(0, 18000);
       }
     }
 

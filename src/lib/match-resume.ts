@@ -1,3 +1,10 @@
+import {
+  dedupeSections,
+  parseResumeSections,
+  sectionsToText,
+  type ResumeSection
+} from "@/lib/resume-structure";
+
 type MatchResumeInput = {
   resumeText: string;
   jobDescription: string;
@@ -12,7 +19,9 @@ type BulletDiff = {
 
 export type MatchResumeResult = {
   improvedText: string;
+  sectionedResume: ResumeSection[];
   beforeAfterBullets: BulletDiff[];
+  topKeywords: string[];
   addedKeywords: string[];
   missingKeywords: string[];
   atsMatchScore: number;
@@ -44,10 +53,17 @@ type GeminiResponse = {
 };
 
 type ParsedMatchResumeResult = Partial<
-  Omit<MatchResumeResult, "improvementSummary" | "beforeAfterBullets">
+  Omit<MatchResumeResult, "improvementSummary" | "beforeAfterBullets" | "sectionedResume">
 > & {
   improvementSummary?: string[] | string;
   beforeAfterBullets?: Array<Partial<BulletDiff>>;
+  sectionedResume?: Array<{
+    heading?: string;
+    title?: string;
+    lines?: string[];
+    bullets?: string[];
+    content?: string[];
+  }>;
 };
 
 const RISKY_TERMS = [
@@ -105,6 +121,8 @@ function buildPrompt({
     "- No markdown fences.",
     "- No commentary outside JSON.",
     "- Keep beforeAfterBullets grounded in the original resume text.",
+    "- sectionedResume must be the final polished resume grouped into standard resume sections.",
+    "- topKeywords should be the most important ATS keywords from the job description.",
     ""
   ];
 
@@ -147,9 +165,13 @@ function buildPrompt({
     "Return this exact JSON shape:",
     '{',
     '  "improvedText": "string",',
+    '  "sectionedResume": [',
+    '    { "heading": "string", "lines": ["string"] }',
+    "  ],",
     '  "beforeAfterBullets": [',
     '    { "before": "string", "after": "string" }',
     "  ],",
+    '  "topKeywords": ["string"],',
     '  "addedKeywords": ["string"],',
     '  "missingKeywords": ["string"],',
     '  "atsMatchScore": 0,',
@@ -220,6 +242,21 @@ function normalizeText(value: string) {
   return value.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+function uniqueStrings(values: string[]) {
+  const seen = new Set<string>();
+
+  return values.filter((value) => {
+    const key = normalizeText(value);
+
+    if (!key || seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
 function hasUnsupportedMetric(before: string, after: string, originalResumeText: string) {
   const metricPattern = /\b\d+(?:[.,]\d+)?%?|\b\d+\s?(?:x|years?|months?)\b/gi;
   const afterMatches = after.match(metricPattern) ?? [];
@@ -255,6 +292,25 @@ function clampScore(value: number) {
   }
 
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function sanitizeSectionLines(lines: string[], resumeText: string) {
+  return uniqueStrings(
+    lines
+      .map((line) => line.replace(/^[•·]\s*/, "").trim())
+      .filter(Boolean)
+      .map((line) => {
+        if (
+          hasUnsupportedMetric(line, line, resumeText) ||
+          hasUnsupportedRiskyTerm(line, resumeText)
+        ) {
+          return "";
+        }
+
+        return line;
+      })
+      .filter(Boolean)
+  );
 }
 
 function sanitizeBeforeAfterBullets(
@@ -306,11 +362,58 @@ function extractSummary(value: ParsedMatchResumeResult["improvementSummary"]) {
   return [];
 }
 
+function extractSectionedResume(
+  parsedSections: ParsedMatchResumeResult["sectionedResume"],
+  resumeText: string
+) {
+  if (!Array.isArray(parsedSections)) {
+    return [] as ResumeSection[];
+  }
+
+  const normalized = parsedSections
+    .map((section) => {
+      const heading =
+        typeof section.heading === "string"
+          ? section.heading.trim()
+          : typeof section.title === "string"
+            ? section.title.trim()
+            : "";
+      const linesSource = Array.isArray(section.lines)
+        ? section.lines
+        : Array.isArray(section.bullets)
+          ? section.bullets
+          : Array.isArray(section.content)
+            ? section.content
+            : [];
+      const lines = sanitizeSectionLines(
+        linesSource.filter((line): line is string => typeof line === "string"),
+        resumeText
+      );
+
+      if (!heading || lines.length === 0) {
+        return null;
+      }
+
+      return {
+        heading,
+        lines
+      };
+    })
+    .filter((section): section is ResumeSection => Boolean(section));
+
+  return dedupeSections(normalized);
+}
+
 function buildImprovedText(
   parsedImprovedText: string | undefined,
+  sectionedResume: ResumeSection[],
   beforeAfterBullets: BulletDiff[],
   resumeText: string
 ) {
+  if (sectionedResume.length > 0) {
+    return sectionsToText(sectionedResume);
+  }
+
   if (typeof parsedImprovedText === "string" && parsedImprovedText.trim()) {
     return parsedImprovedText.trim();
   }
@@ -350,19 +453,35 @@ function parseJsonResponse(rawText: string, input: MatchResumeInput): MatchResum
     input.resumeText
   );
 
+  const sectionedResume = extractSectionedResume(parsed.sectionedResume, input.resumeText);
+
   const improvedText = buildImprovedText(
     typeof parsed.improvedText === "string" ? parsed.improvedText : undefined,
+    sectionedResume,
     beforeAfterBullets,
     input.resumeText
   );
 
+  const normalizedImprovedSections =
+    sectionedResume.length > 0 ? sectionedResume : parseResumeSections(improvedText);
+
   const normalizedResume = normalizeText(input.resumeText);
   const normalizedImprovedText = normalizeText(improvedText);
 
+  const topKeywords = Array.isArray(parsed.topKeywords)
+    ? uniqueStrings(
+        parsed.topKeywords
+          .filter((keyword): keyword is string => typeof keyword === "string")
+          .map((keyword) => keyword.trim())
+      )
+    : [];
+
   const addedKeywords = Array.isArray(parsed.addedKeywords)
-    ? parsed.addedKeywords
-        .filter((keyword): keyword is string => typeof keyword === "string")
-        .map((keyword) => keyword.trim())
+    ? uniqueStrings(
+        parsed.addedKeywords
+          .filter((keyword): keyword is string => typeof keyword === "string")
+          .map((keyword) => keyword.trim())
+      )
         .filter(
           (keyword) =>
             Boolean(keyword) &&
@@ -372,9 +491,11 @@ function parseJsonResponse(rawText: string, input: MatchResumeInput): MatchResum
     : [];
 
   const missingKeywords = Array.isArray(parsed.missingKeywords)
-    ? parsed.missingKeywords
-        .filter((keyword): keyword is string => typeof keyword === "string")
-        .map((keyword) => keyword.trim())
+    ? uniqueStrings(
+        parsed.missingKeywords
+          .filter((keyword): keyword is string => typeof keyword === "string")
+          .map((keyword) => keyword.trim())
+      )
         .filter(
           (keyword) =>
             Boolean(keyword) && !normalizedImprovedText.includes(normalizeText(keyword))
@@ -385,7 +506,9 @@ function parseJsonResponse(rawText: string, input: MatchResumeInput): MatchResum
 
   return {
     improvedText,
+    sectionedResume: normalizedImprovedSections,
     beforeAfterBullets,
+    topKeywords,
     addedKeywords,
     missingKeywords,
     atsMatchScore:

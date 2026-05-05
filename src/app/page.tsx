@@ -36,8 +36,9 @@ export default function Home() {
   return (
     <main className="relative min-h-screen py-6 sm:py-8">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute left-[-8rem] top-[-6rem] h-60 w-60 rounded-full bg-[var(--color-accent)]/20 blur-3xl" />
-        <div className="absolute right-[-6rem] top-24 h-72 w-72 rounded-full bg-[var(--color-brand)]/20 blur-3xl" />
+        <div className="animate-float-slow absolute left-[-8rem] top-[-6rem] h-60 w-60 rounded-full bg-[var(--color-accent)]/20 blur-3xl" />
+        <div className="animate-float-slow animation-delay-150 absolute right-[-6rem] top-24 h-72 w-72 rounded-full bg-[var(--color-brand)]/20 blur-3xl" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--color-brand)]/30 to-transparent" />
       </div>
       <Container>
         <div className="overflow-hidden rounded-[2rem] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-soft)]">
@@ -55,8 +56,8 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="mt-16 grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
-              <div>
+            <div className="mt-16 grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
+              <div className="animate-rise-in">
                 <span className="inline-flex rounded-full border border-[var(--color-accent)]/20 bg-[var(--color-accent-soft)] px-4 py-2 text-sm font-medium text-[var(--color-brand)]">
                   Built for Indian job seekers
                 </span>
@@ -81,7 +82,7 @@ export default function Home() {
                   {highlights.map((item) => (
                     <span
                       key={item}
-                      className="rounded-full border border-[var(--color-border)] bg-white px-4 py-2"
+                      className="rounded-full border border-[var(--color-border)] bg-white px-4 py-2 shadow-sm"
                     >
                       {item}
                     </span>
@@ -89,7 +90,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="rounded-[1.75rem] border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-surface-soft)] to-white p-5 shadow-[0_25px_80px_rgba(18,52,88,0.12)]">
+              <div className="animate-rise-in animation-delay-150 rounded-[1.75rem] border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-surface-soft)] via-white to-[var(--color-surface-accent)] p-5 shadow-[0_25px_80px_rgba(18,52,88,0.12)]">
                 <div className="rounded-[1.5rem] border border-[var(--color-border)] bg-white/95 p-5 backdrop-blur">
                   <div className="flex items-center justify-between text-sm text-[var(--color-text-soft)]">
                     <span>Match preview</span>
@@ -132,6 +133,40 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
+                <div className="mt-5 grid gap-4 sm:grid-cols-[1.1fr_0.9fr]">
+                  <div className="rounded-[1.5rem] border border-[var(--color-border)] bg-[var(--color-brand)] p-5 text-white shadow-[0_18px_42px_rgba(18,52,88,0.18)]">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/70">
+                      Resume workspace
+                    </p>
+                    <div className="mt-5 space-y-3">
+                      <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white/80">
+                        Upload resume
+                      </div>
+                      <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white/80">
+                        Paste JD or import job URL
+                      </div>
+                      <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white/80">
+                        Compare bullet-level changes
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-text-soft)]">
+                      Export modes
+                    </p>
+                    <div className="mt-4 space-y-3">
+                      <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-3 text-sm text-[var(--color-text)]">
+                        Classic ATS
+                      </div>
+                      <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-3 text-sm text-[var(--color-text)]">
+                        Modern two-column
+                      </div>
+                      <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-soft)] px-4 py-3 text-sm text-[var(--color-text)]">
+                        Executive banded
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -154,7 +189,7 @@ export default function Home() {
                 {problems.map((problem) => (
                   <div
                     key={problem}
-                    className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5"
+                    className="rounded-[1.5rem] border border-[var(--color-border)] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card)]"
                   >
                     <div className="flex gap-4">
                       <span className="mt-1.5 h-2.5 w-2.5 rounded-full bg-[var(--color-accent)]" />
@@ -182,7 +217,7 @@ export default function Home() {
               {steps.map((step, index) => (
                 <div
                   key={step.title}
-                  className="rounded-[1.75rem] border border-[var(--color-border)] bg-white p-6"
+                  className="rounded-[1.75rem] border border-[var(--color-border)] bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-[var(--shadow-card)]"
                 >
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-brand)] text-lg font-bold text-white">
                     {index + 1}
